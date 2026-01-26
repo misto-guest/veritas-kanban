@@ -1,5 +1,28 @@
 [
   {
+    "id": "activity_1769428430293_r58fn28l7",
+    "type": "status_changed",
+    "taskId": "task_20260126_m4OisW",
+    "taskTitle": "US-706: Auto-archive suggestions",
+    "details": {
+      "from": "todo",
+      "status": "in-progress"
+    },
+    "timestamp": "2026-01-26T11:53:50.293Z"
+  },
+  {
+    "id": "activity_1769428426839_ifp093ztg",
+    "type": "task_created",
+    "taskId": "task_20260126_m4OisW",
+    "taskTitle": "US-706: Auto-archive suggestions",
+    "details": {
+      "type": "code",
+      "priority": "low",
+      "project": "veritas-kanban"
+    },
+    "timestamp": "2026-01-26T11:53:46.839Z"
+  },
+  {
     "id": "activity_1769428411051_otkhs6aer",
     "type": "status_changed",
     "taskId": "task_20260126_eZNCQk",

@@ -24,6 +24,7 @@ import {
   searchParamsToFilters,
 } from './FilterBar';
 import { BulkActionsBar } from './BulkActionsBar';
+import { ProjectArchiveSuggestion } from './ProjectArchiveSuggestion';
 
 const COLUMNS: { id: TaskStatus; title: string }[] = [
   { id: 'todo', title: 'To Do' },
@@ -200,6 +201,8 @@ export function KanbanBoard() {
       />
       
       <BulkActionsBar allTaskIds={filteredTasks.map(t => t.id)} />
+      
+      <ProjectArchiveSuggestion tasks={tasks || []} />
       
       <DndContext
         sensors={sensors}

@@ -99,6 +99,15 @@ export const api = {
       return handleResponse<void>(response);
     },
 
+    bulkArchive: async (project: string): Promise<{ archived: string[]; count: number }> => {
+      const response = await fetch(`${API_BASE}/tasks/bulk-archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project }),
+      });
+      return handleResponse(response);
+    },
+
     restore: async (id: string): Promise<Task> => {
       const response = await fetch(`${API_BASE}/tasks/${id}/restore`, {
         method: 'POST',

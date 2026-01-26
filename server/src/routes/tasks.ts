@@ -256,6 +256,37 @@ router.post('/:id/archive', async (req, res) => {
   }
 });
 
+// POST /api/tasks/bulk-archive - Archive multiple tasks by project
+router.post('/bulk-archive', async (req, res) => {
+  try {
+    const { project } = req.body as { project: string };
+    if (!project) {
+      return res.status(400).json({ error: 'Project is required' });
+    }
+
+    const tasks = await taskService.listTasks();
+    const projectTasks = tasks.filter(t => t.project === project && t.status === 'done');
+    
+    if (projectTasks.length === 0) {
+      return res.status(400).json({ error: 'No completed tasks found for this project' });
+    }
+
+    const archived: string[] = [];
+    for (const task of projectTasks) {
+      const success = await taskService.archiveTask(task.id);
+      if (success) {
+        archived.push(task.id);
+        await activityService.logActivity('task_archived', task.id, task.title);
+      }
+    }
+
+    res.json({ archived, count: archived.length });
+  } catch (error) {
+    console.error('Error bulk archiving tasks:', error);
+    res.status(500).json({ error: 'Failed to archive tasks' });
+  }
+});
+
 // POST /api/tasks/:id/restore - Restore task from archive
 router.post('/:id/restore', async (req, res) => {
   try {

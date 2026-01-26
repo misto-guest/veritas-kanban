@@ -71,6 +71,18 @@ export function useArchiveTask() {
   });
 }
 
+export function useBulkArchive() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (project: string) => api.tasks.bulkArchive(project),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'archived'] });
+    },
+  });
+}
+
 export function useRestoreTask() {
   const queryClient = useQueryClient();
   
