@@ -1,5 +1,27 @@
 [
   {
+    "id": "activity_1769447559137_w5so806no",
+    "type": "status_changed",
+    "taskId": "task_20260126_PcoH5E",
+    "taskTitle": "US-711: Running indicator on task cards",
+    "details": {
+      "from": "todo",
+      "status": "done"
+    },
+    "timestamp": "2026-01-26T17:12:39.137Z"
+  },
+  {
+    "id": "activity_1769447556556_p485o3bml",
+    "type": "status_changed",
+    "taskId": "task_20260126_elXGhz",
+    "taskTitle": "US-710: Time tracking",
+    "details": {
+      "from": "todo",
+      "status": "done"
+    },
+    "timestamp": "2026-01-26T17:12:36.556Z"
+  },
+  {
     "id": "activity_1769430230977_j23cqvfdt",
     "type": "task_deleted",
     "taskId": "task_20260126_yi65DL",
