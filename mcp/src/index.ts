@@ -358,6 +358,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['id'],
         },
       },
+      {
+        name: 'get_summary',
+        description: 'Get overall kanban summary (status counts, projects, high-priority)',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'get_memory_summary',
+        description: 'Get task summary formatted for memory files (completed tasks, active high-priority, project progress)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            hours: {
+              type: 'number',
+              description: 'Hours to look back (default: 24)',
+            },
+          },
+        },
+      },
     ],
   };
 });
@@ -614,6 +635,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: `Automation ${response.status === 'complete' ? 'completed' : 'marked as failed'}: ${task.id}`,
             },
           ],
+        };
+      }
+
+      case 'get_summary': {
+        const summary = await api<unknown>('/api/summary');
+        return {
+          content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+        };
+      }
+
+      case 'get_memory_summary': {
+        const hours = (args as { hours?: number })?.hours || 24;
+        const res = await fetch(`${API_BASE}/api/summary/memory?hours=${hours}`);
+        const markdown = await res.text();
+        return {
+          content: [{ type: 'text', text: markdown }],
         };
       }
 
