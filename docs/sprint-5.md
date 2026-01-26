@@ -133,3 +133,4 @@ vk memory -o ~/clawd/memory/$(date +%Y-%m-%d).md
 - `6112517` feat(US-503): Veritas sub-agent integration
 - `7d7e92e` feat(US-504): Memory system sync
 - `809bf4d` feat(US-505): Teams notification integration
+- `59fcafb` fix: add automation field to UpdateTaskInput type
