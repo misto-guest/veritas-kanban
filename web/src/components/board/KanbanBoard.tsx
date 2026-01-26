@@ -1,6 +1,8 @@
 import { useTasks, useTasksByStatus, useUpdateTask } from '@/hooks/useTasks';
 import { KanbanColumn } from './KanbanColumn';
-import type { TaskStatus } from '@veritas-kanban/shared';
+import { TaskDetailPanel } from '@/components/task/TaskDetailPanel';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { TaskStatus, Task } from '@veritas-kanban/shared';
 import {
   DndContext,
   DragEndEvent,
@@ -13,7 +15,6 @@ import {
 } from '@dnd-kit/core';
 import { useState } from 'react';
 import { TaskCard } from '@/components/task/TaskCard';
-import type { Task } from '@veritas-kanban/shared';
 
 const COLUMNS: { id: TaskStatus; title: string }[] = [
   { id: 'todo', title: 'To Do' },
@@ -22,11 +23,48 @@ const COLUMNS: { id: TaskStatus; title: string }[] = [
   { id: 'done', title: 'Done' },
 ];
 
+function LoadingSkeleton() {
+  return (
+    <div className="grid grid-cols-4 gap-4">
+      {COLUMNS.map(column => (
+        <div
+          key={column.id}
+          className="flex flex-col rounded-lg bg-muted/50 border-t-2 border-t-muted-foreground/20"
+        >
+          <div className="flex items-center justify-between px-3 py-2">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-5 w-6 rounded-full" />
+          </div>
+          <div className="flex-1 p-2 space-y-2 min-h-[calc(100vh-200px)]">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-card border border-border rounded-md p-3 space-y-2">
+                <div className="flex items-start gap-2">
+                  <Skeleton className="h-4 w-4 mt-0.5" />
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-5 w-16 rounded" />
+                  <Skeleton className="h-5 w-12 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function KanbanBoard() {
   const { data: tasks, isLoading, error } = useTasks();
   const tasksByStatus = useTasksByStatus(tasks);
   const updateTask = useUpdateTask();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -61,47 +99,75 @@ export function KanbanBoard() {
     }
   };
 
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setDetailOpen(true);
+  };
+
+  const handleDetailClose = (open: boolean) => {
+    setDetailOpen(open);
+    if (!open) {
+      // Small delay to allow animation to complete
+      setTimeout(() => setSelectedTask(null), 200);
+    }
+  };
+
+  // Keep selected task in sync with updated data
+  const currentSelectedTask = selectedTask 
+    ? tasks?.find(t => t.id === selectedTask.id) || selectedTask
+    : null;
+
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-muted-foreground">Loading tasks...</div>
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   if (error) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-destructive">
-          Error loading tasks: {error.message}
+        <div className="text-center space-y-2">
+          <div className="text-destructive font-medium">
+            Error loading tasks
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {error.message}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="grid grid-cols-4 gap-4">
-        {COLUMNS.map(column => (
-          <KanbanColumn
-            key={column.id}
-            id={column.id}
-            title={column.title}
-            tasks={tasksByStatus[column.id]}
-          />
-        ))}
-      </div>
-      
-      <DragOverlay>
-        {activeTask ? (
-          <TaskCard task={activeTask} isDragging />
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+    <>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="grid grid-cols-4 gap-4">
+          {COLUMNS.map(column => (
+            <KanbanColumn
+              key={column.id}
+              id={column.id}
+              title={column.title}
+              tasks={tasksByStatus[column.id]}
+              onTaskClick={handleTaskClick}
+            />
+          ))}
+        </div>
+        
+        <DragOverlay>
+          {activeTask ? (
+            <TaskCard task={activeTask} isDragging />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      <TaskDetailPanel
+        task={currentSelectedTask}
+        open={detailOpen}
+        onOpenChange={handleDetailClose}
+      />
+    </>
   );
 }

@@ -7,6 +7,7 @@ interface KanbanColumnProps {
   id: TaskStatus;
   title: string;
   tasks: Task[];
+  onTaskClick?: (task: Task) => void;
 }
 
 const columnColors: Record<TaskStatus, string> = {
@@ -16,16 +17,16 @@ const columnColors: Record<TaskStatus, string> = {
   'done': 'border-t-green-500',
 };
 
-export function KanbanColumn({ id, title, tasks }: KanbanColumnProps) {
+export function KanbanColumn({ id, title, tasks, onTaskClick }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        'flex flex-col rounded-lg bg-muted/50 border-t-2',
+        'flex flex-col rounded-lg bg-muted/50 border-t-2 transition-all',
         columnColors[id],
-        isOver && 'ring-2 ring-primary/50'
+        isOver && 'ring-2 ring-primary/50 bg-muted/70'
       )}
     >
       <div className="flex items-center justify-between px-3 py-2">
@@ -39,12 +40,19 @@ export function KanbanColumn({ id, title, tasks }: KanbanColumnProps) {
       
       <div className="flex-1 p-2 space-y-2 min-h-[calc(100vh-200px)] overflow-y-auto">
         {tasks.length === 0 ? (
-          <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
-            No tasks
+          <div className={cn(
+            'flex items-center justify-center h-24 text-sm text-muted-foreground rounded-md border-2 border-dashed',
+            isOver && 'border-primary/50 bg-primary/5'
+          )}>
+            {isOver ? 'Drop here' : 'No tasks'}
           </div>
         ) : (
           tasks.map(task => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard 
+              key={task.id} 
+              task={task} 
+              onClick={() => onTaskClick?.(task)}
+            />
           ))
         )}
       </div>
