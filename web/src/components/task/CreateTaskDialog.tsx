@@ -18,7 +18,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCreateTask } from '@/hooks/useTasks';
+import { useTemplates, type TaskTemplate } from '@/hooks/useTemplates';
 import type { TaskType, TaskPriority } from '@veritas-kanban/shared';
+import { FileText } from 'lucide-react';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -31,8 +33,22 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
   const [type, setType] = useState<TaskType>('code');
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [project, setProject] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
   const createTask = useCreateTask();
+  const { data: templates } = useTemplates();
+
+  const applyTemplate = (template: TaskTemplate) => {
+    setSelectedTemplate(template.id);
+    if (template.taskDefaults.type) setType(template.taskDefaults.type);
+    if (template.taskDefaults.priority) setPriority(template.taskDefaults.priority);
+    if (template.taskDefaults.project) setProject(template.taskDefaults.project);
+    if (template.taskDefaults.descriptionTemplate) setDescription(template.taskDefaults.descriptionTemplate);
+  };
+
+  const clearTemplate = () => {
+    setSelectedTemplate(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +69,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
     setType('code');
     setPriority('medium');
     setProject('');
+    setSelectedTemplate(null);
     onOpenChange(false);
   };
 
@@ -63,6 +80,41 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
           </DialogHeader>
+          
+          {/* Template selector */}
+          {templates && templates.length > 0 && (
+            <div className="flex items-center gap-2 py-2 border-b">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <Select
+                value={selectedTemplate || 'none'}
+                onValueChange={(value) => {
+                  if (value === 'none') {
+                    clearTemplate();
+                  } else {
+                    const template = templates.find(t => t.id === value);
+                    if (template) applyTemplate(template);
+                  }
+                }}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Use a template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No template</SelectItem>
+                  {templates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                      {template.description && (
+                        <span className="text-muted-foreground ml-2">
+                          — {template.description}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">

@@ -1,4 +1,41 @@
-import type { Task, CreateTaskInput, UpdateTaskInput, AppConfig, RepoConfig, AgentConfig, AgentType } from '@veritas-kanban/shared';
+import type { Task, CreateTaskInput, UpdateTaskInput, AppConfig, RepoConfig, AgentConfig, AgentType, TaskType, TaskPriority } from '@veritas-kanban/shared';
+
+// Template types
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  taskDefaults: {
+    type?: TaskType;
+    priority?: TaskPriority;
+    project?: string;
+    descriptionTemplate?: string;
+  };
+  created: string;
+  updated: string;
+}
+
+export interface CreateTemplateInput {
+  name: string;
+  description?: string;
+  taskDefaults: {
+    type?: TaskType;
+    priority?: TaskPriority;
+    project?: string;
+    descriptionTemplate?: string;
+  };
+}
+
+export interface UpdateTemplateInput {
+  name?: string;
+  description?: string;
+  taskDefaults?: {
+    type?: TaskType;
+    priority?: TaskPriority;
+    project?: string;
+    descriptionTemplate?: string;
+  };
+}
 
 const API_BASE = '/api';
 
@@ -230,6 +267,43 @@ export const api = {
     getFullDiff: async (taskId: string): Promise<FileDiff[]> => {
       const response = await fetch(`${API_BASE}/diff/${taskId}/full`);
       return handleResponse<FileDiff[]>(response);
+    },
+  },
+
+  templates: {
+    list: async (): Promise<TaskTemplate[]> => {
+      const response = await fetch(`${API_BASE}/templates`);
+      return handleResponse<TaskTemplate[]>(response);
+    },
+
+    get: async (id: string): Promise<TaskTemplate> => {
+      const response = await fetch(`${API_BASE}/templates/${id}`);
+      return handleResponse<TaskTemplate>(response);
+    },
+
+    create: async (input: CreateTemplateInput): Promise<TaskTemplate> => {
+      const response = await fetch(`${API_BASE}/templates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+      return handleResponse<TaskTemplate>(response);
+    },
+
+    update: async (id: string, input: UpdateTemplateInput): Promise<TaskTemplate> => {
+      const response = await fetch(`${API_BASE}/templates/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+      return handleResponse<TaskTemplate>(response);
+    },
+
+    delete: async (id: string): Promise<void> => {
+      const response = await fetch(`${API_BASE}/templates/${id}`, {
+        method: 'DELETE',
+      });
+      return handleResponse<void>(response);
     },
   },
 };

@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -34,8 +35,14 @@ import {
   useUpdateAgents,
   useSetDefaultAgent,
 } from '@/hooks/useConfig';
-import { Plus, Trash2, Check, X, Loader2, FolderGit2, Bot, Star } from 'lucide-react';
-import type { RepoConfig, AgentConfig, AgentType } from '@veritas-kanban/shared';
+import {
+  useTemplates,
+  useCreateTemplate,
+  useDeleteTemplate,
+  type TaskTemplate,
+} from '@/hooks/useTemplates';
+import { Plus, Trash2, Check, X, Loader2, FolderGit2, Bot, Star, FileText } from 'lucide-react';
+import type { RepoConfig, AgentConfig, AgentType, TaskType, TaskPriority } from '@veritas-kanban/shared';
 import { cn } from '@/lib/utils';
 
 interface SettingsDialogProps {
@@ -219,6 +226,170 @@ function RepoItem({ repo }: { repo: RepoConfig }) {
   );
 }
 
+// Template Components
+function AddTemplateForm({ onClose }: { onClose: () => void }) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [type, setType] = useState<TaskType | ''>('');
+  const [priority, setPriority] = useState<TaskPriority | ''>('');
+  const [project, setProject] = useState('');
+  const [descriptionTemplate, setDescriptionTemplate] = useState('');
+
+  const createTemplate = useCreateTemplate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    
+    await createTemplate.mutateAsync({
+      name: name.trim(),
+      description: description.trim() || undefined,
+      taskDefaults: {
+        type: type || undefined,
+        priority: priority || undefined,
+        project: project.trim() || undefined,
+        descriptionTemplate: descriptionTemplate.trim() || undefined,
+      },
+    });
+    onClose();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 border rounded-lg p-4 bg-muted/30">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <FileText className="h-4 w-4" />
+        Add Template
+      </div>
+
+      <div className="grid gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-2">
+            <Label htmlFor="template-name">Name *</Label>
+            <Input
+              id="template-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Bug Fix"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="template-desc">Description</Label>
+            <Input
+              id="template-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g., Template for bug fixes"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="grid gap-2">
+            <Label>Default Type</Label>
+            <Select value={type} onValueChange={(v) => setType(v as TaskType)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Any" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="code">Code</SelectItem>
+                <SelectItem value="research">Research</SelectItem>
+                <SelectItem value="content">Content</SelectItem>
+                <SelectItem value="automation">Automation</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Default Priority</Label>
+            <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Any" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Default Project</Label>
+            <Input
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+              placeholder="e.g., rubicon"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <Label>Description Template</Label>
+          <Textarea
+            value={descriptionTemplate}
+            onChange={(e) => setDescriptionTemplate(e.target.value)}
+            placeholder="Pre-filled description text..."
+            rows={2}
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={!name.trim() || createTemplate.isPending}>
+          {createTemplate.isPending ? 'Creating...' : 'Create Template'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function TemplateItem({ template }: { template: TaskTemplate }) {
+  const deleteTemplate = useDeleteTemplate();
+
+  return (
+    <div className="flex items-center justify-between py-2 px-3 rounded-md border bg-card">
+      <div className="flex items-center gap-3">
+        <FileText className="h-4 w-4 text-muted-foreground" />
+        <div>
+          <div className="font-medium">{template.name}</div>
+          <div className="text-xs text-muted-foreground">
+            {[
+              template.taskDefaults.type,
+              template.taskDefaults.priority,
+              template.taskDefaults.project,
+            ].filter(Boolean).join(' • ') || 'No defaults'}
+          </div>
+        </div>
+      </div>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete the "{template.name}" template.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTemplate.mutate(template.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 function AgentItem({ 
   agent, 
   isDefault,
@@ -279,7 +450,9 @@ function AgentItem({
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { data: config, isLoading } = useConfig();
+  const { data: templates, isLoading: templatesLoading } = useTemplates();
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddTemplateForm, setShowAddTemplateForm] = useState(false);
   const updateAgents = useUpdateAgents();
   const setDefaultAgent = useSetDefaultAgent();
 
@@ -359,6 +532,41 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     onToggle={() => handleToggleAgent(agent.type)}
                     onSetDefault={() => handleSetDefaultAgent(agent.type)}
                   />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Templates Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium">Task Templates</h3>
+              {!showAddTemplateForm && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddTemplateForm(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Template
+                </Button>
+              )}
+            </div>
+
+            {showAddTemplateForm && (
+              <AddTemplateForm onClose={() => setShowAddTemplateForm(false)} />
+            )}
+
+            {templatesLoading ? (
+              <div className="text-sm text-muted-foreground">Loading...</div>
+            ) : !templates || templates.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-4 text-center border rounded-md border-dashed">
+                No templates created. Templates pre-fill task fields when creating new tasks.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {templates.map((template) => (
+                  <TemplateItem key={template.id} template={template} />
                 ))}
               </div>
             )}

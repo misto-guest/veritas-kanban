@@ -13,7 +13,7 @@
 |----|-------|--------|-------|
 | US-601 | Keyboard shortcuts | ✅ Complete | c, j/k, Enter, Esc, 1-4, ? |
 | US-602 | Filter and search | ✅ Complete | Project/type dropdowns, text search |
-| US-603 | Task templates | ⏳ Todo | New from Template option |
+| US-603 | Task templates | ✅ Complete | New from Template option |
 | US-604 | Bulk actions | ⏳ Todo | Multi-select, bulk status/archive/delete |
 | US-605 | Activity log | ⏳ Todo | Toggleable sidebar |
 
@@ -44,3 +44,12 @@
 - Active filter count badge with "Clear all" button
 - URL persistence (filters sync to query params)
 - Added Badge UI component
+
+**US-603: Task templates** ✅
+- Created TemplateService for server-side template management
+- Templates stored as markdown files in `.veritas-kanban/templates/`
+- API endpoints: GET/POST/PATCH/DELETE /api/templates
+- Template fields: name, description, taskDefaults (type, priority, project, descriptionTemplate)
+- Template selector in CreateTaskDialog
+- Template management UI in Settings dialog
+- Added api.templates methods to api.ts
