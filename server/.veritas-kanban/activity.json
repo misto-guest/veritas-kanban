@@ -1,5 +1,34 @@
 [
   {
+    "id": "activity_1769430230977_j23cqvfdt",
+    "type": "task_deleted",
+    "taskId": "task_20260126_yi65DL",
+    "taskTitle": "Second test task",
+    "timestamp": "2026-01-26T12:23:50.977Z"
+  },
+  {
+    "id": "activity_1769430224902_zy0xsfue6",
+    "type": "status_changed",
+    "taskId": "task_20260126_yi65DL",
+    "taskTitle": "Second test task",
+    "details": {
+      "from": "archived",
+      "status": "done"
+    },
+    "timestamp": "2026-01-26T12:23:44.902Z"
+  },
+  {
+    "id": "activity_1769430188393_1tv5il6mm",
+    "type": "status_changed",
+    "taskId": "task_20260126_FTRJ_R",
+    "taskTitle": "US-709: Merge conflict resolution",
+    "details": {
+      "from": "todo",
+      "status": "done"
+    },
+    "timestamp": "2026-01-26T12:23:08.393Z"
+  },
+  {
     "id": "activity_1769429690306_c0btfp6gv",
     "type": "status_changed",
     "taskId": "task_20260126_d6o4vo",

@@ -130,6 +130,17 @@ router.post('/archive/project/:project', async (req, res) => {
   }
 });
 
+// GET /api/tasks/time/summary - Get time summary by project (must be before /:id)
+router.get('/time/summary', async (_req, res) => {
+  try {
+    const summary = await taskService.getTimeSummary();
+    res.json(summary);
+  } catch (error) {
+    console.error('Error getting time summary:', error);
+    res.status(500).json({ error: 'Failed to get time summary' });
+  }
+});
+
 // GET /api/tasks/:id - Get single task
 router.get('/:id', async (req, res) => {
   try {
@@ -495,6 +506,56 @@ router.get('/:id/worktree/open', async (req, res) => {
   } catch (error: any) {
     console.error('Error getting open command:', error);
     res.status(400).json({ error: error.message || 'Failed to get open command' });
+  }
+});
+
+// === Time Tracking Routes ===
+
+// POST /api/tasks/:id/time/start - Start timer for a task
+router.post('/:id/time/start', async (req, res) => {
+  try {
+    const task = await taskService.startTimer(req.params.id);
+    res.json(task);
+  } catch (error: any) {
+    console.error('Error starting timer:', error);
+    res.status(400).json({ error: error.message || 'Failed to start timer' });
+  }
+});
+
+// POST /api/tasks/:id/time/stop - Stop timer for a task
+router.post('/:id/time/stop', async (req, res) => {
+  try {
+    const task = await taskService.stopTimer(req.params.id);
+    res.json(task);
+  } catch (error: any) {
+    console.error('Error stopping timer:', error);
+    res.status(400).json({ error: error.message || 'Failed to stop timer' });
+  }
+});
+
+// POST /api/tasks/:id/time/entry - Add manual time entry
+router.post('/:id/time/entry', async (req, res) => {
+  try {
+    const { duration, description } = req.body;
+    if (typeof duration !== 'number' || duration <= 0) {
+      return res.status(400).json({ error: 'Duration must be a positive number (in seconds)' });
+    }
+    const task = await taskService.addTimeEntry(req.params.id, duration, description);
+    res.json(task);
+  } catch (error: any) {
+    console.error('Error adding time entry:', error);
+    res.status(400).json({ error: error.message || 'Failed to add time entry' });
+  }
+});
+
+// DELETE /api/tasks/:id/time/entry/:entryId - Delete a time entry
+router.delete('/:id/time/entry/:entryId', async (req, res) => {
+  try {
+    const task = await taskService.deleteTimeEntry(req.params.id, req.params.entryId);
+    res.json(task);
+  } catch (error: any) {
+    console.error('Error deleting time entry:', error);
+    res.status(400).json({ error: error.message || 'Failed to delete time entry' });
   }
 });
 

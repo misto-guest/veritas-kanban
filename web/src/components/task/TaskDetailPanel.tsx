@@ -43,6 +43,7 @@ import { ReviewPanel } from './ReviewPanel';
 import { SubtasksSection } from './SubtasksSection';
 import { DependenciesSection } from './DependenciesSection';
 import { PreviewPanel } from './PreviewPanel';
+import { TimeTrackingSection } from './TimeTrackingSection';
 
 interface TaskDetailPanelProps {
   task: Task | null;
@@ -322,6 +323,11 @@ export function TaskDetailPanel({ task, open, onOpenChange }: TaskDetailPanelPro
                   task={localTask}
                   onBlockedByChange={(blockedBy) => updateField('blockedBy', blockedBy)}
                 />
+              </div>
+
+              {/* Time Tracking */}
+              <div className="border-t pt-4">
+                <TimeTrackingSection task={localTask} />
               </div>
 
               <div className="border-t pt-4 space-y-2 text-sm text-muted-foreground">

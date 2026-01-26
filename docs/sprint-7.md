@@ -20,7 +20,7 @@
 | US-707 | GitHub PR creation | ✅ Done | None | Create PR from task detail UI |
 | US-708 | Preview mode | ✅ Done | None | Embedded browser for dev server preview |
 | US-709 | Merge conflict resolution | ✅ Done | None | Visual conflict resolver UI |
-| US-710 | Time tracking | ⏳ Todo | None | Start/stop timer, manual entry, reports |
+| US-710 | Time tracking | ✅ Done | None | Start/stop timer, manual entry, reports |
 | US-711 | Running indicator on cards | ⏳ Todo | None | Spinner/pulse animation when agent running |
 
 ---
@@ -164,5 +164,20 @@
   - File navigation (prev/next)
 - Conflict warning banner in GitSection when conflicts detected
 - Auto-polling when conflicts present
+
+**US-710: Time tracking** ✅
+- TimeEntry and TimeTracking types added to shared types
+- TaskService methods: startTimer, stopTimer, addTimeEntry, deleteTimeEntry, getTimeSummary
+- API endpoints: /api/tasks/:id/time/start, stop, entry, /api/tasks/time/summary
+- TimeTrackingSection component:
+  - Start/Stop timer button with live elapsed time display
+  - Manual time entry dialog (supports "1h 30m", "45m", or minutes)
+  - Time entries list with descriptions
+  - Delete entries (except running)
+  - Total time display
+- Time indicator on TaskCard:
+  - Shows total tracked time
+  - Animated timer icon when running
+- formatDuration and parseDuration utility functions
 
 (Starting Sprint 7)

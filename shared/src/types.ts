@@ -30,6 +30,22 @@ export interface Subtask {
   created: string;
 }
 
+export interface TimeEntry {
+  id: string;
+  startTime: string;
+  endTime?: string;       // Undefined if timer is running
+  duration?: number;      // Duration in seconds (calculated when stopped)
+  description?: string;   // Optional note for the entry
+  manual?: boolean;       // True if manually entered
+}
+
+export interface TimeTracking {
+  entries: TimeEntry[];
+  totalSeconds: number;   // Total tracked time in seconds
+  isRunning: boolean;     // Is timer currently running
+  activeEntryId?: string; // ID of the currently running entry
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -71,6 +87,9 @@ export interface Task {
     completedAt?: string;   // When sub-agent finished
     result?: string;        // Result summary from sub-agent
   };
+
+  // Time tracking
+  timeTracking?: TimeTracking;
 }
 
 export interface ReviewComment {
@@ -121,6 +140,7 @@ export interface UpdateTaskInput {
     completedAt?: string;
     result?: string;
   };
+  timeTracking?: TimeTracking;
 }
 
 export interface TaskFilters {

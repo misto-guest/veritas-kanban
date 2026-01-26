@@ -101,6 +101,7 @@ export class TaskService {
       autoCompleteOnSubtasks: data.autoCompleteOnSubtasks,
       blockedBy: data.blockedBy,
       automation: data.automation,
+      timeTracking: data.timeTracking,
     };
   }
 
@@ -318,5 +319,170 @@ export class TaskService {
       archived: archivedIds.length,
       taskIds: archivedIds,
     };
+  }
+
+  // ============ Time Tracking Methods ============
+
+  /**
+   * Start a timer for a task
+   */
+  async startTimer(taskId: string): Promise<Task> {
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    // Check if timer is already running
+    if (task.timeTracking?.isRunning) {
+      throw new Error('Timer is already running for this task');
+    }
+
+    const entryId = `time_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const now = new Date().toISOString();
+
+    const newEntry = {
+      id: entryId,
+      startTime: now,
+    };
+
+    const timeTracking = {
+      entries: [...(task.timeTracking?.entries || []), newEntry],
+      totalSeconds: task.timeTracking?.totalSeconds || 0,
+      isRunning: true,
+      activeEntryId: entryId,
+    };
+
+    return this.updateTask(taskId, { timeTracking }) as Promise<Task>;
+  }
+
+  /**
+   * Stop the running timer for a task
+   */
+  async stopTimer(taskId: string): Promise<Task> {
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    if (!task.timeTracking?.isRunning || !task.timeTracking.activeEntryId) {
+      throw new Error('No timer is running for this task');
+    }
+
+    const now = new Date();
+    const entries = task.timeTracking.entries.map(entry => {
+      if (entry.id === task.timeTracking!.activeEntryId) {
+        const startTime = new Date(entry.startTime);
+        const duration = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+        return {
+          ...entry,
+          endTime: now.toISOString(),
+          duration,
+        };
+      }
+      return entry;
+    });
+
+    // Recalculate total
+    const totalSeconds = entries.reduce((sum, e) => sum + (e.duration || 0), 0);
+
+    const timeTracking = {
+      entries,
+      totalSeconds,
+      isRunning: false,
+      activeEntryId: undefined,
+    };
+
+    return this.updateTask(taskId, { timeTracking }) as Promise<Task>;
+  }
+
+  /**
+   * Add a manual time entry
+   */
+  async addTimeEntry(taskId: string, duration: number, description?: string): Promise<Task> {
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    const entryId = `time_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const now = new Date().toISOString();
+
+    const newEntry = {
+      id: entryId,
+      startTime: now,
+      endTime: now,
+      duration,
+      description,
+      manual: true,
+    };
+
+    const entries = [...(task.timeTracking?.entries || []), newEntry];
+    const totalSeconds = entries.reduce((sum, e) => sum + (e.duration || 0), 0);
+
+    const timeTracking = {
+      entries,
+      totalSeconds,
+      isRunning: task.timeTracking?.isRunning || false,
+      activeEntryId: task.timeTracking?.activeEntryId,
+    };
+
+    return this.updateTask(taskId, { timeTracking }) as Promise<Task>;
+  }
+
+  /**
+   * Delete a time entry
+   */
+  async deleteTimeEntry(taskId: string, entryId: string): Promise<Task> {
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    const entries = (task.timeTracking?.entries || []).filter(e => e.id !== entryId);
+    const totalSeconds = entries.reduce((sum, e) => sum + (e.duration || 0), 0);
+
+    // If we deleted the active entry, stop the timer
+    const wasActive = task.timeTracking?.activeEntryId === entryId;
+
+    const timeTracking = {
+      entries,
+      totalSeconds,
+      isRunning: wasActive ? false : (task.timeTracking?.isRunning || false),
+      activeEntryId: wasActive ? undefined : task.timeTracking?.activeEntryId,
+    };
+
+    return this.updateTask(taskId, { timeTracking }) as Promise<Task>;
+  }
+
+  /**
+   * Get time summary by project
+   */
+  async getTimeSummary(): Promise<{ 
+    byProject: { project: string; totalSeconds: number; taskCount: number }[];
+    total: number;
+  }> {
+    const tasks = await this.listTasks();
+    
+    const projectMap = new Map<string, { totalSeconds: number; taskCount: number }>();
+    let total = 0;
+
+    for (const task of tasks) {
+      const seconds = task.timeTracking?.totalSeconds || 0;
+      if (seconds > 0) {
+        total += seconds;
+        const project = task.project || '(No Project)';
+        const existing = projectMap.get(project) || { totalSeconds: 0, taskCount: 0 };
+        projectMap.set(project, {
+          totalSeconds: existing.totalSeconds + seconds,
+          taskCount: existing.taskCount + 1,
+        });
+      }
+    }
+
+    const byProject = Array.from(projectMap.entries())
+      .map(([project, data]) => ({ project, ...data }))
+      .sort((a, b) => b.totalSeconds - a.totalSeconds);
+
+    return { byProject, total };
   }
 }
