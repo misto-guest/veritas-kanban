@@ -67,7 +67,7 @@ export function PreviewPanel({ task, open, onOpenChange }: PreviewPanelProps) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[800px] sm:max-w-[800px] p-0 flex flex-col">
         <SheetHeader className="px-6 py-4 border-b">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-8">
             <div>
               <SheetTitle className="flex items-center gap-2">
                 <Monitor className="h-5 w-5" />

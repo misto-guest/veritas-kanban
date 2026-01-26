@@ -177,7 +177,7 @@ export function ArchiveSidebar({ open, onOpenChange, onTaskClick }: ArchiveSideb
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[400px] sm:w-[450px] p-0">
         <SheetHeader className="px-4 py-3 border-b">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-8">
             <SheetTitle className="flex items-center gap-2">
               <Archive className="h-5 w-5" />
               Archive

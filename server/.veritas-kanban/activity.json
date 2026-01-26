@@ -1,5 +1,89 @@
 [
   {
+    "id": "activity_1769449185820_cctph1fac",
+    "type": "task_deleted",
+    "taskId": "task_20260126_tsDVOq",
+    "taskTitle": "Test feature branch",
+    "timestamp": "2026-01-26T17:39:45.820Z"
+  },
+  {
+    "id": "activity_1769449175512_6lvnf3bgl",
+    "type": "task_updated",
+    "taskId": "task_20260126_tsDVOq",
+    "taskTitle": "Test feature branch",
+    "timestamp": "2026-01-26T17:39:35.512Z"
+  },
+  {
+    "id": "activity_1769448961158_7hmywa016",
+    "type": "status_changed",
+    "taskId": "task_20260126_9VIZY1",
+    "taskTitle": "Test task from CLI",
+    "details": {
+      "from": "archived",
+      "status": "done"
+    },
+    "timestamp": "2026-01-26T17:36:01.158Z"
+  },
+  {
+    "id": "activity_1769448955837_m815ex2dh",
+    "type": "task_archived",
+    "taskId": "task_20260126_9VIZY1",
+    "taskTitle": "Test task from CLI",
+    "timestamp": "2026-01-26T17:35:55.837Z"
+  },
+  {
+    "id": "activity_1769448944900_dm04m4zyu",
+    "type": "status_changed",
+    "taskId": "task_20260126_9VIZY1",
+    "taskTitle": "Test task from CLI",
+    "details": {
+      "from": "in-progress",
+      "status": "done"
+    },
+    "timestamp": "2026-01-26T17:35:44.900Z"
+  },
+  {
+    "id": "activity_1769448691266_xbovau2j5",
+    "type": "task_updated",
+    "taskId": "task_20260126_tsDVOq",
+    "taskTitle": "Test feature branch",
+    "timestamp": "2026-01-26T17:31:31.266Z"
+  },
+  {
+    "id": "activity_1769448671292_o56r391ij",
+    "type": "task_created",
+    "taskId": "task_20260126_tsDVOq",
+    "taskTitle": "Test feature branch",
+    "details": {
+      "type": "code",
+      "priority": "medium",
+      "project": "test"
+    },
+    "timestamp": "2026-01-26T17:31:11.292Z"
+  },
+  {
+    "id": "activity_1769448643552_50ghtkm2u",
+    "type": "status_changed",
+    "taskId": "task_20260126_9VIZY1",
+    "taskTitle": "Test task from CLI",
+    "details": {
+      "from": "todo",
+      "status": "in-progress"
+    },
+    "timestamp": "2026-01-26T17:30:43.552Z"
+  },
+  {
+    "id": "activity_1769448480165_c8bcel8bk",
+    "type": "task_created",
+    "taskId": "task_20260126_9VIZY1",
+    "taskTitle": "Test task from CLI",
+    "details": {
+      "type": "code",
+      "priority": "high"
+    },
+    "timestamp": "2026-01-26T17:28:00.165Z"
+  },
+  {
     "id": "activity_1769447559137_w5so806no",
     "type": "status_changed",
     "taskId": "task_20260126_PcoH5E",

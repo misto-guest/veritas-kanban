@@ -126,7 +126,7 @@ export function ConflictResolver({ task, open, onOpenChange }: ConflictResolverP
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="right" className="w-[90vw] sm:max-w-[1200px] p-0 flex flex-col">
           <SheetHeader className="px-6 py-4 border-b">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pr-8">
               <div>
                 <SheetTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-amber-500" />
