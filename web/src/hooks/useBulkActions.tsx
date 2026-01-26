@@ -1,0 +1,77 @@
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+
+interface BulkActionsContextValue {
+  selectedIds: Set<string>;
+  isSelecting: boolean;
+  toggleSelecting: () => void;
+  toggleSelect: (id: string) => void;
+  selectAll: (ids: string[]) => void;
+  clearSelection: () => void;
+  isSelected: (id: string) => boolean;
+}
+
+const BulkActionsContext = createContext<BulkActionsContextValue | null>(null);
+
+export function BulkActionsProvider({ children }: { children: ReactNode }) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSelecting, setIsSelecting] = useState(false);
+
+  const toggleSelecting = useCallback(() => {
+    setIsSelecting(prev => {
+      if (prev) {
+        // Clear selection when exiting selection mode
+        setSelectedIds(new Set());
+      }
+      return !prev;
+    });
+  }, []);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback((ids: string[]) => {
+    setSelectedIds(new Set(ids));
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setIsSelecting(false);
+  }, []);
+
+  const isSelected = useCallback((id: string) => {
+    return selectedIds.has(id);
+  }, [selectedIds]);
+
+  const value: BulkActionsContextValue = {
+    selectedIds,
+    isSelecting,
+    toggleSelecting,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+    isSelected,
+  };
+
+  return (
+    <BulkActionsContext.Provider value={value}>
+      {children}
+    </BulkActionsContext.Provider>
+  );
+}
+
+export function useBulkActions() {
+  const context = useContext(BulkActionsContext);
+  if (!context) {
+    throw new Error('useBulkActions must be used within BulkActionsProvider');
+  }
+  return context;
+}

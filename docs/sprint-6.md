@@ -14,7 +14,7 @@
 | US-601 | Keyboard shortcuts | ✅ Complete | c, j/k, Enter, Esc, 1-4, ? |
 | US-602 | Filter and search | ✅ Complete | Project/type dropdowns, text search |
 | US-603 | Task templates | ✅ Complete | New from Template option |
-| US-604 | Bulk actions | ⏳ Todo | Multi-select, bulk status/archive/delete |
+| US-604 | Bulk actions | ✅ Complete | Multi-select, bulk status/archive/delete |
 | US-605 | Activity log | ⏳ Todo | Toggleable sidebar |
 
 ---
@@ -53,3 +53,14 @@
 - Template selector in CreateTaskDialog
 - Template management UI in Settings dialog
 - Added api.templates methods to api.ts
+
+**US-604: Bulk actions** ✅
+- Created BulkActionsProvider context for selection state
+- BulkActionsBar component with:
+  - Toggle selection mode
+  - Select all / deselect all
+  - Move to status dropdown
+  - Archive selected
+  - Delete selected (with confirmation)
+- Checkbox selection on task cards when in selection mode
+- Added useArchiveTask hook

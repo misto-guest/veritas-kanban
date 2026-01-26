@@ -52,6 +52,17 @@ export function useDeleteTask() {
   });
 }
 
+export function useArchiveTask() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (id: string) => api.tasks.archive(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
 export function useTasksByStatus(tasks: Task[] | undefined) {
   if (!tasks) {
     return {

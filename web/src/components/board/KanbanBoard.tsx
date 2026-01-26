@@ -23,6 +23,7 @@ import {
   filtersToSearchParams,
   searchParamsToFilters,
 } from './FilterBar';
+import { BulkActionsBar } from './BulkActionsBar';
 
 const COLUMNS: { id: TaskStatus; title: string }[] = [
   { id: 'todo', title: 'To Do' },
@@ -202,6 +203,8 @@ export function KanbanBoard() {
         filters={filters}
         onFiltersChange={setFilters}
       />
+      
+      <BulkActionsBar allTaskIds={filteredTasks.map(t => t.id)} />
       
       <DndContext
         sensors={sensors}

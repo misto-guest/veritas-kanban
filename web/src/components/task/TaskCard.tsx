@@ -7,7 +7,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import type { Task, TaskType, TaskPriority } from '@veritas-kanban/shared';
-import { Code, Search, FileText, Zap } from 'lucide-react';
+import { Code, Search, FileText, Zap, Check } from 'lucide-react';
+import { useBulkActions } from '@/hooks/useBulkActions';
 
 interface TaskCardProps {
   task: Task;
@@ -40,6 +41,8 @@ export function TaskCard({ task, isDragging, onClick, isSelected }: TaskCardProp
   const { attributes, listeners, setNodeRef, transform, isDragging: isCurrentlyDragging } = useDraggable({
     id: task.id,
   });
+  const { isSelecting, toggleSelect, isSelected: isBulkSelected } = useBulkActions();
+  const isChecked = isBulkSelected(task.id);
 
   const style = transform
     ? {
@@ -50,7 +53,19 @@ export function TaskCard({ task, isDragging, onClick, isSelected }: TaskCardProp
   const handleClick = () => {
     // Don't open detail panel if we're dragging
     if (isCurrentlyDragging || isDragging) return;
+    
+    // If in selection mode, toggle selection instead
+    if (isSelecting) {
+      toggleSelect(task.id);
+      return;
+    }
+    
     onClick?.();
+  };
+
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleSelect(task.id);
   };
 
   return (
@@ -74,6 +89,19 @@ export function TaskCard({ task, isDragging, onClick, isSelected }: TaskCardProp
             )}
           >
             <div className="flex items-start gap-2">
+              {isSelecting && (
+                <button
+                  onClick={handleCheckboxClick}
+                  className={cn(
+                    'h-4 w-4 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors',
+                    isChecked
+                      ? 'bg-primary border-primary text-primary-foreground'
+                      : 'border-muted-foreground/50 hover:border-primary'
+                  )}
+                >
+                  {isChecked && <Check className="h-3 w-3" />}
+                </button>
+              )}
               <span className="text-muted-foreground mt-0.5 flex-shrink-0">
                 {typeIcons[task.type]}
               </span>
