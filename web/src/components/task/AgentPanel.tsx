@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -27,6 +28,8 @@ import {
   useStopAgent,
   useSendMessage,
   useAgentStream,
+  useAgentAttempts,
+  useAgentLog,
 } from '@/hooks/useAgent';
 import {
   Play,
@@ -38,18 +41,31 @@ import {
   AlertCircle,
   Wifi,
   WifiOff,
+  History,
+  RotateCcw,
+  CheckCircle2,
+  XCircle,
+  Clock,
 } from 'lucide-react';
-import type { Task, AgentType } from '@veritas-kanban/shared';
+import type { Task, AgentType, AttemptStatus } from '@veritas-kanban/shared';
 import { cn } from '@/lib/utils';
 
 interface AgentPanelProps {
   task: Task;
 }
 
+const attemptStatusIcons: Record<AttemptStatus, React.ReactNode> = {
+  pending: <Clock className="h-3 w-3 text-muted-foreground" />,
+  running: <Loader2 className="h-3 w-3 text-blue-500 animate-spin" />,
+  complete: <CheckCircle2 className="h-3 w-3 text-green-500" />,
+  failed: <XCircle className="h-3 w-3 text-red-500" />,
+};
+
 export function AgentPanel({ task }: AgentPanelProps) {
   const { data: config } = useConfig();
   const { data: agentStatus } = useAgentStatus(task.id);
   const { outputs, isConnected, isRunning, clearOutputs } = useAgentStream(task.id);
+  const { data: attempts, refetch: refetchAttempts } = useAgentAttempts(task.id);
   
   const startAgent = useStartAgent();
   const stopAgent = useStopAgent();
@@ -58,8 +74,15 @@ export function AgentPanel({ task }: AgentPanelProps) {
   const [selectedAgent, setSelectedAgent] = useState<AgentType | undefined>();
   const [message, setMessage] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
+  const [viewingAttemptId, setViewingAttemptId] = useState<string | null>(null);
   
   const outputRef = useRef<HTMLDivElement>(null);
+  
+  // Fetch log for historical attempt
+  const { data: attemptLog, isLoading: isLoadingLog } = useAgentLog(
+    viewingAttemptId ? task.id : undefined, 
+    viewingAttemptId || undefined
+  );
 
   // Get enabled agents
   const enabledAgents = config?.agents.filter(a => a.enabled) || [];
@@ -82,9 +105,14 @@ export function AgentPanel({ task }: AgentPanelProps) {
 
   const handleStart = () => {
     clearOutputs();
+    setViewingAttemptId(null); // Switch back to live view
     startAgent.mutate({
       taskId: task.id,
       agent: selectedAgent || defaultAgent,
+    }, {
+      onSuccess: () => {
+        refetchAttempts();
+      }
     });
   };
 
@@ -261,14 +289,105 @@ export function AgentPanel({ task }: AgentPanelProps) {
         )}
       </div>
 
+      {/* New Attempt button for completed/failed tasks */}
+      {task.attempt && ['complete', 'failed'].includes(task.attempt.status) && !isAgentRunning && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={handleStart}
+        >
+          <RotateCcw className="h-4 w-4 mr-2" />
+          New Attempt
+        </Button>
+      )}
+
+      {/* Attempt History */}
+      {attempts && attempts.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-muted-foreground flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Attempt History ({attempts.length})
+          </Label>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {attempts.map((attemptId) => {
+              const isCurrentAttempt = task.attempt?.id === attemptId;
+              const attemptStatus = isCurrentAttempt ? task.attempt?.status : 'complete';
+              const isViewing = viewingAttemptId === attemptId;
+              
+              return (
+                <div
+                  key={attemptId}
+                  className={cn(
+                    "flex items-center gap-2 p-2 rounded-md text-xs cursor-pointer transition-colors",
+                    isViewing ? "bg-primary/10 border border-primary/30" : "bg-muted/50 hover:bg-muted"
+                  )}
+                  onClick={() => {
+                    if (isCurrentAttempt && isAgentRunning) {
+                      setViewingAttemptId(null); // Show live output
+                    } else {
+                      setViewingAttemptId(isViewing ? null : attemptId);
+                    }
+                  }}
+                >
+                  {attemptStatusIcons[attemptStatus as AttemptStatus] || attemptStatusIcons.complete}
+                  <span className="font-mono flex-1 truncate">{attemptId}</span>
+                  {isCurrentAttempt && (
+                    <Badge variant="secondary" className="text-xs">Current</Badge>
+                  )}
+                  {isViewing && !isCurrentAttempt && (
+                    <Badge variant="outline" className="text-xs">Viewing</Badge>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Historical attempt log viewer */}
+      {viewingAttemptId && viewingAttemptId !== task.attempt?.id && (
+        <div className="rounded-md border bg-muted/30 overflow-hidden">
+          <div className="flex items-center justify-between p-2 border-b bg-card">
+            <span className="text-xs text-muted-foreground">
+              Viewing: {viewingAttemptId}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewingAttemptId(null)}
+            >
+              Close
+            </Button>
+          </div>
+          <div className="h-[200px] overflow-y-auto p-3 font-mono text-xs bg-zinc-950 text-zinc-200">
+            {isLoadingLog ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Loading log...
+              </div>
+            ) : attemptLog ? (
+              <pre className="whitespace-pre-wrap">{attemptLog}</pre>
+            ) : (
+              <div className="text-muted-foreground">No log available</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Current attempt info */}
-      {task.attempt && (
-        <div className="text-xs text-muted-foreground space-y-1">
-          <div>Attempt: {task.attempt.id}</div>
+      {task.attempt && !viewingAttemptId && (
+        <div className="text-xs text-muted-foreground space-y-1 p-2 rounded-md bg-muted/30">
+          <div className="flex items-center gap-2">
+            {attemptStatusIcons[task.attempt.status]}
+            <span className="font-medium">Current: {task.attempt.id}</span>
+          </div>
           <div>Agent: {task.attempt.agent}</div>
-          <div>Status: {task.attempt.status}</div>
           {task.attempt.started && (
             <div>Started: {new Date(task.attempt.started).toLocaleString()}</div>
+          )}
+          {task.attempt.ended && (
+            <div>Ended: {new Date(task.attempt.ended).toLocaleString()}</div>
           )}
         </div>
       )}

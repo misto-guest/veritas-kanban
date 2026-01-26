@@ -15,7 +15,7 @@
 | US-702 | Restore from archive | ✅ Done | US-701 | Unarchive tasks back to board |
 | US-703 | Subtasks | ✅ Done | None | Nested tasks with parent completion logic |
 | US-704 | Task dependencies | ✅ Done | US-703 | Block tasks until dependencies complete |
-| US-705 | Multiple task attempts | ⏳ Todo | None | Retry with different agent, preserve history |
+| US-705 | Multiple task attempts | ✅ Done | None | Retry with different agent, preserve history |
 | US-706 | Auto-archive suggestions | ⏳ Todo | US-701, US-703 | Suggest archiving when project complete |
 | US-707 | GitHub PR creation | ⏳ Todo | None | Create PR from task detail UI |
 | US-708 | Preview mode | ⏳ Todo | None | Embedded browser for dev server preview |

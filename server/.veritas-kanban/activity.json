@@ -1,5 +1,39 @@
 [
   {
+    "id": "activity_1769428411051_otkhs6aer",
+    "type": "status_changed",
+    "taskId": "task_20260126_eZNCQk",
+    "taskTitle": "US-705: Multiple task attempts",
+    "details": {
+      "from": "in-progress",
+      "status": "done"
+    },
+    "timestamp": "2026-01-26T11:53:31.051Z"
+  },
+  {
+    "id": "activity_1769428342497_qijcsn58a",
+    "type": "status_changed",
+    "taskId": "task_20260126_eZNCQk",
+    "taskTitle": "US-705: Multiple task attempts",
+    "details": {
+      "from": "todo",
+      "status": "in-progress"
+    },
+    "timestamp": "2026-01-26T11:52:22.497Z"
+  },
+  {
+    "id": "activity_1769428338411_6js6nt4zu",
+    "type": "task_created",
+    "taskId": "task_20260126_eZNCQk",
+    "taskTitle": "US-705: Multiple task attempts",
+    "details": {
+      "type": "code",
+      "priority": "medium",
+      "project": "veritas-kanban"
+    },
+    "timestamp": "2026-01-26T11:52:18.411Z"
+  },
+  {
     "id": "activity_1769428327832_17zksrrf9",
     "type": "status_changed",
     "taskId": "task_20260126_leQOQ5",
