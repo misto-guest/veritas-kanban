@@ -235,6 +235,7 @@ function AddTemplateForm({ onClose }: { onClose: () => void }) {
   const [type, setType] = useState<TaskType | ''>('');
   const [priority, setPriority] = useState<TaskPriority | ''>('');
   const [project, setProject] = useState('');
+  const [agent, setAgent] = useState<AgentType | ''>('');
   const [descriptionTemplate, setDescriptionTemplate] = useState('');
 
   const createTemplate = useCreateTemplate();
@@ -251,6 +252,7 @@ function AddTemplateForm({ onClose }: { onClose: () => void }) {
         type: type || undefined,
         priority: priority || undefined,
         project: project.trim() || undefined,
+        agent: agent || undefined,
         descriptionTemplate: descriptionTemplate.trim() || undefined,
       },
     });
@@ -302,7 +304,7 @@ function AddTemplateForm({ onClose }: { onClose: () => void }) {
           </Select>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-2">
             <Label>Default Type</Label>
             <Select value={type} onValueChange={(v) => setType(v as TaskType)}>
@@ -330,6 +332,9 @@ function AddTemplateForm({ onClose }: { onClose: () => void }) {
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-2">
             <Label>Default Project</Label>
             <Input
@@ -337,6 +342,21 @@ function AddTemplateForm({ onClose }: { onClose: () => void }) {
               onChange={(e) => setProject(e.target.value)}
               placeholder="e.g., rubicon"
             />
+          </div>
+          <div className="grid gap-2">
+            <Label>Preferred Agent</Label>
+            <Select value={agent} onValueChange={(v) => setAgent(v as AgentType)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Any" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="claude-code">Claude Code</SelectItem>
+                <SelectItem value="amp">Amp</SelectItem>
+                <SelectItem value="copilot">Copilot</SelectItem>
+                <SelectItem value="gemini">Gemini</SelectItem>
+                <SelectItem value="veritas">Veritas</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -384,6 +404,7 @@ function TemplateItem({ template }: { template: TaskTemplate }) {
               template.taskDefaults.type,
               template.taskDefaults.priority,
               template.taskDefaults.project,
+              template.taskDefaults.agent,
             ].filter(Boolean).join(' • ') || 'No defaults'}
           </div>
         </div>
