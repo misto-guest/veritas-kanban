@@ -1,4 +1,5 @@
 import { Router, type Router as RouterType } from 'express';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { getTaskService } from '../services/task-service.js';
 import { activityService } from '../services/activity-service.js';
@@ -39,7 +40,7 @@ router.post(
     }
 
     const comment = {
-      id: `comment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      id: `comment_${randomUUID()}`,
       author,
       text,
       timestamp: new Date().toISOString(),

@@ -180,7 +180,7 @@ export function AgentStatusIndicator({
   const [lastStatus, setLastStatus] = useState<string | null>(null);
   const [statusHistory, setStatusHistory] = useState<StatusHistoryEntry[]>([]);
   const [uptimeStart, setUptimeStart] = useState<Date | null>(null);
-  const [, forceUpdate] = useState(0);
+  const [tick, setTick] = useState(0);
 
   // Fetch recent agent-related activity for status history
   const { data: activities } = useQuery({
@@ -236,7 +236,7 @@ export function AgentStatusIndicator({
 
   // Force update every second for uptime display
   useEffect(() => {
-    const interval = setInterval(() => forceUpdate((n) => n + 1), 1000);
+    const interval = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -284,7 +284,7 @@ export function AgentStatusIndicator({
   const uptimeDisplay = useMemo(() => {
     if (!uptimeStart) return null;
     return formatDuration(uptimeStart.toISOString());
-  }, [uptimeStart, forceUpdate]); // forceUpdate triggers recalc
+  }, [uptimeStart, tick]); // tick increments every second to trigger recalc
 
   // Screen reader announcement
   const ariaLabel = useMemo(() => {

@@ -37,7 +37,7 @@ export function GitSelectionForm({ task, onGitChange }: GitSelectionFormProps) {
 
   // Get the repo config for the selected repo
   const repoConfig = useMemo(() => {
-    return config?.repos.find(r => r.name === selectedRepo);
+    return config?.repos.find((r) => r.name === selectedRepo);
   }, [config, selectedRepo]);
 
   // Auto-generate feature branch name from task title
@@ -63,15 +63,15 @@ export function GitSelectionForm({ task, onGitChange }: GitSelectionFormProps) {
       setFeatureBranch(task.git.branch || '');
       setAutoGenerateBranch(!task.git.branch);
     }
-  }, [task.id]); // Only re-sync when task changes
+  }, [task.id, task.git?.repo, task.git?.baseBranch, task.git?.branch]); // Re-sync when task or git config changes
 
   // Update parent when values change
   const handleRepoChange = (repo: string) => {
     setSelectedRepo(repo);
-    const newRepoConfig = config?.repos.find(r => r.name === repo);
+    const newRepoConfig = config?.repos.find((r) => r.name === repo);
     const newBaseBranch = newRepoConfig?.defaultBranch || 'main';
     setBaseBranch(newBaseBranch);
-    
+
     onGitChange({
       repo,
       baseBranch: newBaseBranch,
@@ -106,11 +106,7 @@ export function GitSelectionForm({ task, onGitChange }: GitSelectionFormProps) {
       {/* Repository Selection */}
       <div className="grid gap-1.5">
         <Label className="text-xs">Repository</Label>
-        <Select 
-          value={selectedRepo} 
-          onValueChange={handleRepoChange}
-          disabled={isLocked}
-        >
+        <Select value={selectedRepo} onValueChange={handleRepoChange} disabled={isLocked}>
           <SelectTrigger className={cn(isLocked && 'opacity-60')}>
             <SelectValue placeholder="Select repository..." />
           </SelectTrigger>
@@ -138,11 +134,7 @@ export function GitSelectionForm({ task, onGitChange }: GitSelectionFormProps) {
                 Loading branches...
               </div>
             ) : (
-              <Select 
-                value={baseBranch} 
-                onValueChange={handleBaseBranchChange}
-                disabled={isLocked}
-              >
+              <Select value={baseBranch} onValueChange={handleBaseBranchChange} disabled={isLocked}>
                 <SelectTrigger className={cn(isLocked && 'opacity-60')}>
                   <SelectValue placeholder="Select base branch..." />
                 </SelectTrigger>
@@ -168,9 +160,7 @@ export function GitSelectionForm({ task, onGitChange }: GitSelectionFormProps) {
               className={cn(isLocked && 'opacity-60')}
             />
             {autoGenerateBranch && featureBranch && !isLocked && (
-              <p className="text-xs text-muted-foreground">
-                Auto-generated from task title
-              </p>
+              <p className="text-xs text-muted-foreground">Auto-generated from task title</p>
             )}
           </div>
         </>

@@ -1,4 +1,5 @@
 import { Router, type Router as RouterType } from 'express';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { getTaskService } from '../services/task-service.js';
 import { asyncHandler } from '../middleware/async-handler.js';
@@ -37,7 +38,7 @@ router.post(
     }
 
     const subtask = {
-      id: `subtask_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      id: `subtask_${randomUUID()}`,
       title,
       completed: false,
       created: new Date().toISOString(),

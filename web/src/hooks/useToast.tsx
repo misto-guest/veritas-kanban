@@ -10,6 +10,7 @@ type ToastProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   duration?: number;
+  variant?: 'default' | 'destructive';
 };
 
 const TOAST_LIMIT = 3;
@@ -84,9 +85,7 @@ export const reducer = (state: State, action: Action): State => {
     case 'UPDATE_TOAST':
       return {
         ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === action.toast.id ? { ...t, ...action.toast } : t
-        ),
+        toasts: state.toasts.map((t) => (t.id === action.toast.id ? { ...t, ...action.toast } : t)),
       };
 
     case 'DISMISS_TOAST': {

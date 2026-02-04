@@ -108,8 +108,11 @@ export function ArchivePage({ onBack }: ArchivePageProps) {
     try {
       await restoreTask.mutateAsync(taskId);
       toast({ title: 'Task restored', description: 'Task moved back to active board' });
-      selectedIds.delete(taskId);
-      setSelectedIds(new Set(selectedIds));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
     } catch (error) {
       toast({
         title: '❌ Failed to restore task',
