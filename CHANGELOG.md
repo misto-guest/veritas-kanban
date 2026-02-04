@@ -5,9 +5,125 @@ All notable changes to Veritas Kanban are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.5.0] - 2026-02-04
 
-(Nothing yet.)
+### ✨ Highlights
+
+- **Comprehensive SOP Documentation Suite** — 8 new guides covering agent workflows, sprint planning, multi-agent orchestration, code review, best practices, examples, and power user tips
+- **Cross-Model Code Review Enforcement** — Claude ↔ GPT review gate now fully documented with RF-002 91% accuracy validation
+- **Bulk Archive Error Handling** — Fixed silent failures in Done column archival with per-task error tracking and user feedback toasts
+- **Sidebar Metrics Sync** — Fixed stale task counts in board sidebar by invalidating metrics cache on status changes
+
+### Added
+
+#### Documentation (#US-1600)
+
+Complete SOP Sprint with 8 new markdown files in `docs/`:
+
+- **GETTING-STARTED.md** — 5-minute quickstart from zero → agent-ready, includes:
+  - Prerequisites, manual setup wizard, UI/CLI task creation
+  - Agent pickup checklist with agent-requests folder flow
+  - Sanity checks section (API health, UI health, agent pickup verification)
+  - Prompt registry guidance (shared resources pattern from BoardKit)
+  - Documentation freshness SOP (AGENTS.md, CLAUDE.md, BEST-PRACTICES.md)
+  - Multi-repo/multi-agent notes with consistent naming conventions
+  - OpenClaw Browser Relay integration notes for auth-required workflows
+  - Credited Neal (@nealmummau) for asking the triggering question
+
+- **SOP-agent-task-workflow.md** — Complete lifecycle (claim → work → complete):
+  - Roles table (PM, Worker, Human Lead)
+  - Lifecycle overview with 6 stages
+  - API/CLI examples for each step (start timer, status change, completion)
+  - Prompt template for consistent agent instructions
+  - Lessons Learned expectations + notification patterns
+  - Escalation paths for blocked tasks, tooling failures, reviewer disputes
+
+- **SOP-sprint-planning.md** — Epic → Sprint → Task → Subtask hierarchy:
+  - Hierarchy table with real examples (MessageMeld, US-1600)
+  - Sprint planner agent prompt template
+  - Bulk API payload for creating entire sprints at once
+  - Estimation pattern (subtasks × 0.5d = effort)
+  - Assignment workflow (leave unassigned for agent pickup)
+  - Example sprint (US-1600 docs sprint + RF-002 bug fix sprint)
+  - After-planning checklist (recap docs, GitHub milestones, standup scheduling)
+
+- **SOP-multi-agent-orchestration.md** — PM + Worker roles:
+  - PM checklist (plan, assign, track, review, report)
+  - Worker handoff template with clear acceptance criteria
+  - Status reporting cadence (daily updates, standup summaries)
+  - Error escalation paths
+  - Opus-as-PM / Codex-as-worker walkthrough example
+
+- **SOP-cross-model-code-review.md** — Non-negotiable opposite-model gate:
+  - Enforcement rule: If Claude wrote it, GPT reviews; if GPT wrote it, Claude reviews
+  - When to trigger reviews (application code required, docs optional, research optional)
+  - Review workflow (create task, opposite model audits, findings as subtasks, fixes tracked)
+  - Reviewer checklist (Security, Reliability, Performance, Accessibility, Docs)
+  - Prompt template for consistent audits
+  - Escalation paths for disagreements
+  - RF-002 reference (91% accuracy validates the approach)
+
+- **BEST-PRACTICES.md** — Patterns that work + anti-patterns to avoid:
+  - 10 "Do This" rules (time tracking, subtasks, acceptance criteria, atomic scope, SOP updates, etc.)
+  - 10 "Don't Do This" anti-patterns (no acceptance, skipping timers, grab-bag tasks, etc.)
+  - Based on real-world usage with agents
+
+- **EXAMPLES-agent-workflows.md** — 6 copy/pasteable recipes:
+  - Feature development (BrainMeld Lessons Learned)
+  - Bug fix (GH-86 bulk archive)
+  - Documentation update (sanity checks in Getting Started)
+  - Security audit (RF-002 style)
+  - Content production (podcast clip → LinkedIn post)
+  - Research & report (Champions dossiers)
+  - Each includes goal, task creation, prompt, workflow steps, and deliverables
+
+- **TIPS-AND-TRICKS.md** — Power user features:
+  - CLI shortcuts (vk begin/done/block/unblock/time/summary)
+  - Keyboard shortcuts (Cmd+K palette, arrow nav, Esc)
+  - Command palette power moves
+  - WebSocket awareness and polling fallback
+  - MCP server setup for Claude Desktop
+  - Git worktree integration patterns
+  - Obsidian/Brain mirroring with brain-write.sh
+  - Dev helpers (dev:clean, dev:watchdog)
+
+- **README.md** — Added "Documentation Map" section listing all new guides with descriptions
+
+#### Fixes
+
+##### GH-86: Bulk Archive Silent Failure (#86)
+
+**Root Cause:** `BulkActionsBar.handleArchiveSelected()` used `Promise.all()` with no error handling. When any single archive failed, the entire batch would silently reject with zero user feedback.
+
+**Fix:**
+
+- Import `useToast` hook
+- Replace `Promise.all()` with per-task error tracking loop
+- Show success toast (e.g., "Archived 5 tasks")
+- Show error toast on partial/full failure with counts
+- Log individual failures to console for debugging
+- Clear selection regardless of outcome
+- **File:** `web/src/components/board/BulkActionsBar.tsx` (+38 lines)
+
+##### GH-87: Sidebar Task Counts Out of Sync (#87)
+
+**Root Cause:** The sidebar uses `useMetrics('24h')` which polls every 30 seconds with 10-second staleTime. Meanwhile, `useUpdateTask` mutations did NOT invalidate the metrics cache, causing up to 30 seconds of stale data after status changes.
+
+**Fix:**
+
+- Add metrics query invalidation to `useUpdateTask.onSuccess()`
+- Only invalidate when task status changes (prevents over-invalidation)
+- Preserves timer state handling (no aggressive blanket invalidation)
+- **File:** `web/src/hooks/useTasks.ts` (+9 lines)
+
+### Scripts
+
+- **scripts/dev-clean.sh** — Added explicit `pnpm` path resolution for launchd sessions (fixes "command not found" in automated restarts)
+- **scripts/dev-watchdog.sh** — Improved restart storm prevention with lock file + PID checking; fixed pnpm path resolution
+
+### Changed
+
+- Version bumped from 1.4.1 → 1.5.0
 
 ---
 
