@@ -100,6 +100,44 @@ const BudgetSettingsSchema = z
   .strict()
   .optional();
 
+/**
+ * Task lifecycle hooks configuration.
+ *
+ * Hooks are triggered on task state transitions:
+ * - onCreated: Task is created
+ * - onStarted: Task moves to in-progress
+ * - onBlocked: Task moves to blocked
+ * - onCompleted: Task moves to done
+ * - onArchived: Task is archived
+ *
+ * Each hook can specify:
+ * - enabled: Whether the hook is active
+ * - webhook: URL to POST event payload (optional)
+ * - notify: Send notification to configured channel (optional)
+ * - logActivity: Record in activity log (default: true)
+ */
+const HookConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    webhook: z.string().url().optional(),
+    notify: z.boolean().optional(),
+    logActivity: z.boolean().optional(),
+  })
+  .strict()
+  .optional();
+
+const HooksSettingsSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    onCreated: HookConfigSchema,
+    onStarted: HookConfigSchema,
+    onBlocked: HookConfigSchema,
+    onCompleted: HookConfigSchema,
+    onArchived: HookConfigSchema,
+  })
+  .strict()
+  .optional();
+
 export const FeatureSettingsPatchSchema = z
   .object({
     board: BoardSettingsSchema,
@@ -109,6 +147,7 @@ export const FeatureSettingsPatchSchema = z
     notifications: NotificationSettingsSchema,
     archive: ArchiveSettingsSchema,
     budget: BudgetSettingsSchema,
+    hooks: HooksSettingsSchema,
   })
   .strict()
   .refine((val) => !hasDangerousKeys(val), {

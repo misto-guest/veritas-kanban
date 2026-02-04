@@ -16,6 +16,7 @@ import { getTelemetryService, type TelemetryService } from './telemetry-service.
 import { withFileLock } from './file-lock.js';
 import { createLogger } from '../lib/logger.js';
 import { ConflictError, NotFoundError, ValidationError } from '../middleware/error-handler.js';
+import { fireHook, getHookEventForStatusChange } from './hook-service.js';
 
 const log = createLogger('task-cache');
 
@@ -433,6 +434,11 @@ export class TaskService {
       status: task.status,
     });
 
+    // Fire onCreated hook
+    fireHook('onCreated', task).catch((err) => {
+      log.warn({ taskId: task.id }, 'onCreated hook failed: %s', err);
+    });
+
     return task;
   }
 
@@ -503,6 +509,14 @@ export class TaskService {
           status: updatedTask.status,
           previousStatus,
         });
+
+        // Fire lifecycle hook if applicable
+        const hookEvent = getHookEventForStatusChange(previousStatus, updatedTask.status);
+        if (hookEvent) {
+          fireHook(hookEvent, updatedTask, previousStatus).catch((err) => {
+            log.warn({ taskId: updatedTask.id, hookEvent }, 'Hook execution failed: %s', err);
+          });
+        }
       }
     });
 
@@ -571,6 +585,11 @@ export class TaskService {
       taskId: task.id,
       project: task.project,
       status: task.status,
+    });
+
+    // Fire onArchived hook
+    fireHook('onArchived', task).catch((err) => {
+      log.warn({ taskId: task.id }, 'onArchived hook failed: %s', err);
     });
 
     return true;

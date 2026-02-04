@@ -238,18 +238,21 @@ prompt-registry/
 
 Stale docs = hallucinating AI. Keep these files current:
 
-| File                           | Purpose                                                        |
-| ------------------------------ | -------------------------------------------------------------- |
-| `AGENTS.md`                    | Personality, escalation rules, cross-model review requirement. |
-| `SOUL.md`                      | "Who are we?" - tone/voice used by agents.                     |
-| `CLAUDE.md` / `GPT.md`         | Model-specific guardrails or lessons learned.                  |
-| `docs/BEST-PRACTICES.md` (new) | Patterns and anti-patterns all agents follow.                  |
+| File                     | Purpose                                                            |
+| ------------------------ | ------------------------------------------------------------------ |
+| `CLAUDE.md`              | Agent rules, architecture, lessons learned. **Template included.** |
+| `AGENTS.md`              | Personality, escalation rules, cross-model review requirement.     |
+| `SOUL.md`                | "Who are we?" - tone/voice used by agents.                         |
+| `GPT.md` / `CODEX.md`    | Model-specific guardrails (optional).                              |
+| `docs/BEST-PRACTICES.md` | Patterns and anti-patterns all agents follow.                      |
 
 **Cadence:**
 
 - Update immediately after a mistake or new learning.
-- Mirror to Brain/knowledge base if you use one (see `scripts/brain-write.sh`).
+- Run monthly freshness audits (see [SOP-documentation-freshness.md](SOP-documentation-freshness.md)).
 - During sprint closure, skim the "Lessons Learned" field on each task and propagate anything evergreen into AGENTS/CLAUDE.
+
+**Automation:** Future versions will include a "Doc Steward" agent that summarizes recent commits and suggests doc updates. See the [Doc Freshness SOP](SOP-documentation-freshness.md) for the roadmap.
 
 ---
 
@@ -283,6 +286,9 @@ This is invaluable for Champions-style research tasks or anything needing a real
    - [Sprint Planning with AI Agents](SOP-sprint-planning.md)
    - [Multi-Agent Orchestration](SOP-multi-agent-orchestration.md)
    - [Cross-Model Code Review](SOP-cross-model-code-review.md)
+   - [Documentation Freshness](SOP-documentation-freshness.md)
+   - [Shared Resources](SOP-shared-resources.md)
+   - [Lifecycle Hooks](SOP-lifecycle-hooks.md)
 2. Align on [Best Practices](BEST-PRACTICES.md) & [Tips + Tricks](TIPS-AND-TRICKS.md).
 3. Browse [Real-world Examples](EXAMPLES-agent-workflows.md) and steal the prompts.
 4. Keep `docs/TROUBLESHOOTING.md` handy for deeper diagnostics.

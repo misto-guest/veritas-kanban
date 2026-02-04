@@ -195,6 +195,24 @@ export interface BudgetSettings {
   warningThreshold: number; // Percentage threshold for warning (0-100, default 80)
 }
 
+/** Individual hook configuration */
+export interface HookConfig {
+  enabled: boolean;
+  webhook?: string; // URL to POST event payload
+  notify?: boolean; // Send notification to configured channel
+  logActivity?: boolean; // Record in activity log (default: true)
+}
+
+/** Task lifecycle hooks settings */
+export interface HooksSettings {
+  enabled: boolean;
+  onCreated?: HookConfig;
+  onStarted?: HookConfig;
+  onBlocked?: HookConfig;
+  onCompleted?: HookConfig;
+  onArchived?: HookConfig;
+}
+
 /** All feature settings combined */
 export interface FeatureSettings {
   board: BoardSettings;
@@ -204,6 +222,7 @@ export interface FeatureSettings {
   notifications: NotificationSettings;
   archive: ArchiveSettings;
   budget: BudgetSettings;
+  hooks: HooksSettings;
 }
 
 /** Default feature settings — matches current app behavior */
@@ -257,5 +276,9 @@ export const DEFAULT_FEATURE_SETTINGS: FeatureSettings = {
     monthlyTokenLimit: 0, // 0 = no limit
     monthlyCostLimit: 0, // 0 = no limit (dollars)
     warningThreshold: 80, // Warn at 80% of budget
+  },
+  hooks: {
+    enabled: false, // Disabled by default
+    // Individual hooks unconfigured by default
   },
 };
