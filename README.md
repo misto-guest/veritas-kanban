@@ -20,6 +20,8 @@ Built for developers who want a visual Kanban board that works with autonomous c
 
 ⭐ **If you find this useful, star the repo — it helps others discover it!**
 
+> **⚠️ Notice:** Repo history was rewritten (backlog purge). If you cloned recently and see weird git behavior, read: https://github.com/BradGroux/veritas-kanban/discussions/85
+
 [Quickstart](#-quickstart) · [Features](#-feature-highlights) · [All Features](docs/FEATURES.md) · [Docs](docs/) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [API](#-api-versioning) · [Agent Integration](#-agent-integration) · [MCP Server](#-mcp-server) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 </div>
