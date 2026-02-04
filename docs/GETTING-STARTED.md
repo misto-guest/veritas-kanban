@@ -208,17 +208,29 @@ For deeper debugging see [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 BoardKit Orchestrator inspired us here: keep prompts, skills, and guidelines in one place so every repo/agent stays in sync.
 
-**Until first-class registry lands in v1.5, do this manually:**
+**Veritas Kanban includes a starter `prompt-registry/` with 10 templates:**
 
-1. Create `prompt-registry/` at the repo root (git-tracked).
-2. Add Markdown files per workflow, e.g.:
-   - `prompt-registry/sprint-planning.md`
-   - `prompt-registry/code-review.md`
-   - `prompt-registry/research-report.md`
-3. Reference them inside tasks (`See prompt: prompt-registry/...`).
-4. When spawning agents (OpenClaw `sessions_spawn`), paste the relevant prompt so the run is reproducible.
+```
+prompt-registry/
+├── sprint-planning.md      # Break epics into sprints
+├── worker-handoff.md       # PM → Worker assignment
+├── cross-model-review.md   # Claude ↔ GPT review gate
+├── feature-development.md  # E2E feature implementation
+├── bug-triage.md           # Investigation and fix
+├── research-report.md      # Deep research deliverable
+├── task-completion.md      # Pre-completion checklist
+├── blocked-escalation.md   # Blocker reporting
+├── pm-orchestration.md     # PM agent managing workers
+└── standup-summary.md      # Daily status report
+```
 
-> **Future state:** US-1611 will move this into `.veritas-kanban/templates/prompts.json` with UI + API surfaces. Document your prompts now so migration is painless later.
+**Usage:**
+
+1. Reference in task descriptions: `See prompt: prompt-registry/cross-model-review.md`
+2. Copy and customize for your team's conventions
+3. When spawning agents (OpenClaw `sessions_spawn`), paste the relevant prompt
+
+**Multi-repo setup:** See [SOP-shared-resources.md](SOP-shared-resources.md) for patterns on sharing prompts across multiple repositories.
 
 ---
 
