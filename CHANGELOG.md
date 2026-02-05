@@ -5,6 +5,229 @@ All notable changes to Veritas Kanban are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-02-05
+
+### ✨ Highlights
+
+- **Activity Page Redesign** — Streamlined to focus on status history with full-width layout, clickable task navigation, and color-coded status badges
+- **Task Templates UI (#39)** — Full management interface for creating, editing, and instantiating task templates with blueprints
+- **Analytics API (#43)** — New endpoints for timeline visualization and aggregate metrics (parallelism, throughput, lead time)
+- **Status Transition Hooks** — Quality gates and automated actions for task status changes
+- **7 GitHub Issues Closed** — #47, #48, #49, #51, #53, #56, #82 verified complete and documented
+
+### Added
+
+#### Activity Page Improvements
+
+**Full-Width Status History:**
+
+- Removed activity feed column — status history now spans full width
+- Removed redundant "Status History" header label
+- Daily summary panel retained above status history
+- Cleaner, more focused interface for monitoring agent activity
+
+**Clickable Task Navigation:**
+
+- Status history entries now clickable to open task detail panel
+- Keyboard accessible (Enter/Space to activate)
+- Hover state indicates interactivity
+
+**Color-Coded Status Badges:**
+
+- Agent status colors:
+  - `working` / `thinking` — Green
+  - `sub-agent` — Purple
+  - `idle` — Gray
+  - `error` — Red
+- Task status colors (Kanban columns):
+  - `todo` — Slate
+  - `in-progress` — Amber
+  - `blocked` — Red
+  - `done` — Blue
+- Task titles colored to match their new status
+- Uniform badge width for visual consistency
+
+**Task Status Changes:**
+
+- Now shows both agent status changes AND task status changes
+- Task status changes display with kanban column colors
+- Unified timeline view of all activity
+
+**Files:**
+
+- `web/src/components/activity/ActivityFeed.tsx` — Redesigned component
+- `web/src/hooks/useStatusHistory.ts` — Updated color functions
+
+#### Task Templates UI (#39)
+
+Full management interface for task templates:
+
+**Templates Page (`/templates`):**
+
+- Grid view of all templates with category grouping
+- Search and filter by category
+- Quick actions: Edit, Preview, Delete, Create Task
+- Empty state with helpful onboarding
+
+**Template Editor Dialog:**
+
+- Create and edit templates
+- Configure task defaults (type, priority, project, agent)
+- Add subtask templates with ordering
+- Blueprint support for multi-task workflows
+- Validation and error handling
+
+**Template Preview Panel:**
+
+- Read-only preview of template configuration
+- Shows all defaults and subtasks
+- One-click task creation from template
+
+**Files:**
+
+- `web/src/components/templates/TemplatesPage.tsx`
+- `web/src/components/templates/TemplateEditorDialog.tsx`
+- `web/src/components/templates/TemplatePreviewPanel.tsx`
+- `server/src/routes/templates.ts`
+- `server/src/services/template-service.ts`
+
+#### Analytics API (#43)
+
+New endpoints for advanced metrics and visualization:
+
+**Timeline Endpoint:**
+`GET /api/analytics/timeline`
+
+- Returns task execution timeline data
+- Includes start/end times from time tracking
+- Task assignments and status history
+- Parallelism snapshots (concurrent tasks over time)
+- Query params: `from`, `to`, `agent`, `project`, `sprint`
+
+**Metrics Endpoint:**
+`GET /api/analytics/metrics`
+
+- Aggregate metrics for a time period:
+  - Parallelism factor (average concurrent tasks)
+  - Throughput (tasks completed per period)
+  - Lead time (creation to completion)
+  - Agent utilization (working time per agent)
+  - Efficiency metrics (tracked vs total time)
+- Query params: `sprint`, `from`, `to`, `project`
+
+**Files:**
+
+- `server/src/routes/analytics.ts`
+- `server/src/services/analytics-service.ts`
+- `server/src/schemas/analytics-schemas.ts`
+- `docs/API-analytics.md` — Swagger-style documentation
+
+#### Status Transition Hooks
+
+Quality gates and automated actions for task status changes:
+
+**Pre-Transition Gates:**
+
+- Must pass before status change is allowed
+- Examples: require description, require time logged, require code review
+
+**Post-Transition Actions:**
+
+- Fire after status change succeeds
+- Examples: notify channel, update external system, trigger automation
+
+**Configuration:**
+
+- Stored in `.veritas-kanban/transition-hooks.json`
+- Configurable per-transition (e.g., `in-progress` → `done`)
+- Enable/disable globally or per-rule
+
+**Files:**
+
+- `server/src/services/transition-hooks-service.ts`
+- `server/src/routes/transition-hooks.ts`
+- `shared/src/types/transition-hooks.ts`
+
+#### CLI Setup Wizard
+
+Interactive onboarding for new users:
+
+```bash
+vk setup
+```
+
+- Guided configuration of API URL and auth
+- Creates `.veritas-kanban/config.json`
+- Tests connection and validates setup
+- Shows next steps and helpful commands
+
+**Files:**
+
+- `cli/src/commands/setup.ts`
+
+#### Prompt Registry
+
+10 copy/paste prompt templates in `docs/prompt-registry/`:
+
+1. **task-breakdown.md** — Epic → subtasks decomposition
+2. **code-review.md** — Cross-model review prompt
+3. **bug-fix.md** — Structured debugging approach
+4. **documentation.md** — Doc writing guidelines
+5. **security-audit.md** — Security review checklist
+6. **research.md** — Research task structure
+7. **content-creation.md** — Content production workflow
+8. **sprint-planning.md** — Sprint setup prompt
+9. **standup-report.md** — Daily standup generation
+10. **lessons-learned.md** — Post-task reflection
+
+### Fixed
+
+#### Security
+
+**SEC-001: Path Traversal Vulnerability**
+
+- Added validation to trace and template services
+- Prevents `../` path injection in file operations
+- All file paths now resolved and validated against allowed directories
+
+#### Performance
+
+**Telemetry Streaming:**
+
+- Large telemetry reads now streamed instead of loaded into memory
+- Pagination pushed to service layer
+- Optimized lookups for common queries
+
+#### Quality
+
+**React Strict Mode Compliance:**
+
+- Replaced `Math.random()` with `crypto.randomUUID()` for keys
+- Fixed type alignment issues
+- Resolved React warning about duplicate keys
+
+### Changed
+
+#### Dashboard
+
+- Sidebar task counts now show current state, not time-filtered counts
+- Archive/delete/restore operations now correctly find files on disk
+- Metrics cache invalidation on status changes
+
+### Closed Issues
+
+| Issue | Title                                         | Implementation                 |
+| ----- | --------------------------------------------- | ------------------------------ |
+| #82   | Dev reliability (health, dev:clean, watchdog) | Health endpoints + dev scripts |
+| #56   | Dashboard filter bar with presets             | DashboardFilterBar component   |
+| #53   | Per-model cost tables & calculation           | Cost tracking in telemetry     |
+| #51   | Standup summary with model usage              | /api/summary/standup           |
+| #49   | Dashboard Model Usage & Cost panel            | Tokens Card + Cost per Task    |
+| #48   | Global usage aggregation service & API        | /api/metrics/\* endpoints      |
+| #47   | Model Usage schema, types & API               | Full telemetry system          |
+
+---
+
 ## [1.5.0] - 2026-02-04
 
 ### ✨ Highlights

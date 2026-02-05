@@ -1,6 +1,6 @@
 {
   "name": "@veritas-kanban/cli",
-  "version": "1.4.1",
+  "version": "1.6.0",
   "description": "CLI for Veritas Kanban task management",
   "type": "module",
   "bin": {

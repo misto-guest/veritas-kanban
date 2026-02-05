@@ -41,21 +41,21 @@ export function useWeeklySummary() {
  */
 export function formatDurationMs(ms: number): string {
   if (ms < 1000) return '< 1s';
-  
+
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
-  
+
   if (hours > 0) {
     const remainingMinutes = minutes % 60;
     return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
   }
-  
+
   if (minutes > 0) {
     const remainingSeconds = seconds % 60;
     return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
   }
-  
+
   return `${seconds}s`;
 }
 
@@ -77,7 +77,7 @@ export function getStatusColor(status: string): string {
     case 'thinking':
       return 'bg-green-500';
     case 'sub-agent':
-      return 'bg-blue-500';
+      return 'bg-purple-500';
     case 'idle':
       return 'bg-gray-400';
     case 'error':
@@ -96,7 +96,7 @@ export function getStatusTextColor(status: string): string {
     case 'thinking':
       return 'text-green-500';
     case 'sub-agent':
-      return 'text-blue-500';
+      return 'text-purple-500';
     case 'idle':
       return 'text-gray-500';
     case 'error':

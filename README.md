@@ -10,7 +10,7 @@ Built for developers who want a visual Kanban board that works with autonomous c
 
 [![CI](https://github.com/BradGroux/veritas-kanban/actions/workflows/ci.yml/badge.svg)](https://github.com/BradGroux/veritas-kanban/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.4.1-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -129,8 +129,10 @@ Open [http://localhost:3000](http://localhost:3000) — that's it. The board aut
 ### 🔄 Visibility & Automation
 
 - **GitHub Issues sync** — Bidirectional sync between GitHub Issues and your board (inbound import, outbound status/comment push)
-- **Activity feed** — Full-page chronological activity feed with filtering by agent, type, and date; real-time WebSocket updates; compact/detailed toggle
+- **Activity page** — Status history with clickable task navigation, color-coded badges, and daily summary (NEW — v1.6)
 - **Daily standup summary** — Generate standup reports via API or CLI (`vk summary standup`) with completed, in-progress, blocked, and upcoming sections
+- **Task Templates** — Create reusable templates with defaults, subtasks, and multi-task blueprints (NEW — v1.6)
+- **Analytics API** — Timeline visualization and aggregate metrics (parallelism, throughput, lead time) (NEW — v1.6)
 
 ### 🗂️ Organization
 
@@ -620,7 +622,7 @@ pnpm test:e2e   # E2E tests (Playwright)
 
 ## 🗺️ Roadmap
 
-### v1.5.0 — Multi-Agent Ready
+### Next Up — Multi-Agent Ready
 
 See the [open milestones](https://github.com/BradGroux/veritas-kanban/milestones) for what's next. Community contributions welcome!
 
@@ -636,6 +638,13 @@ See the [open milestones](https://github.com/BradGroux/veritas-kanban/milestones
 
 ### Completed
 
+- ~~[Model Usage schema & API](https://github.com/BradGroux/veritas-kanban/issues/47)~~ — shipped in v1.6.0
+- ~~[Global usage aggregation](https://github.com/BradGroux/veritas-kanban/issues/48)~~ — shipped in v1.6.0
+- ~~[Dashboard Model Usage panel](https://github.com/BradGroux/veritas-kanban/issues/49)~~ — shipped in v1.6.0
+- ~~[Standup summary with cost](https://github.com/BradGroux/veritas-kanban/issues/51)~~ — shipped in v1.6.0
+- ~~[Per-model cost tables](https://github.com/BradGroux/veritas-kanban/issues/53)~~ — shipped in v1.6.0
+- ~~[Dashboard filter bar](https://github.com/BradGroux/veritas-kanban/issues/56)~~ — shipped in v1.6.0
+- ~~[Dev reliability (health endpoints)](https://github.com/BradGroux/veritas-kanban/issues/82)~~ — shipped in v1.6.0
 - ~~[Standardized API response envelope](https://github.com/BradGroux/veritas-kanban/issues/2)~~ — shipped in v1.2.0
 - ~~[Circuit breaker pattern](https://github.com/BradGroux/veritas-kanban/issues/3)~~ — shipped in v1.1.0
 - ~~[Load testing suite (k6)](https://github.com/BradGroux/veritas-kanban/issues/4)~~ — shipped in v1.1.0

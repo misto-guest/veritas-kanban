@@ -9,6 +9,7 @@ Complete feature reference for Veritas Kanban. For a quick overview, see the [RE
 - [Board & Task Management](#board--task-management)
 - [Subtasks & Dependencies](#subtasks--dependencies)
 - [Sprint Management](#sprint-management)
+- [Task Templates](#task-templates-v160)
 - [Code Workflow](#code-workflow)
 - [AI Agent Integration](#ai-agent-integration)
 - [GitHub Issues Sync](#github-issues-sync)
@@ -118,6 +119,42 @@ Organize work into time-boxed iterations.
 
 ---
 
+## Task Templates (v1.6.0)
+
+Create reusable templates for consistent task creation.
+
+### Templates Page (`/templates`)
+
+- **Grid view** — All templates displayed in a responsive grid with category grouping
+- **Search & filter** — Search templates by name, filter by category
+- **Quick actions** — Edit, Preview, Delete, Create Task from any template card
+- **Empty state** — Helpful onboarding when no templates exist
+
+### Template Editor
+
+- **Task defaults** — Configure default type, priority, project, agent, description template
+- **Subtask templates** — Define subtasks with title and order that auto-create with new tasks
+- **Blueprint support** — Multi-task workflows with dependencies between blueprint tasks
+- **Validation** — Form validation with clear error messages
+
+### Template Preview
+
+- **Read-only view** — See all template configuration at a glance
+- **One-click creation** — Create a new task from the template immediately
+
+### API Endpoints
+
+| Endpoint                         | Method | Description                  |
+| -------------------------------- | ------ | ---------------------------- |
+| `/api/templates`                 | GET    | List all templates           |
+| `/api/templates`                 | POST   | Create new template          |
+| `/api/templates/:id`             | GET    | Get template by ID           |
+| `/api/templates/:id`             | PUT    | Update template              |
+| `/api/templates/:id`             | DELETE | Delete template              |
+| `/api/templates/:id/instantiate` | POST   | Create task(s) from template |
+
+---
+
 ## Code Workflow
 
 Integrated git workflow from branch creation to merge.
@@ -190,17 +227,26 @@ Bidirectional sync between GitHub Issues and your Kanban board.
 
 ## Activity Feed
 
-Full-page chronological activity feed for project-wide visibility.
+Streamlined activity page focused on status history with real-time updates.
 
-- **Dedicated page** — Accessible from header nav (ListOrdered icon) via `ViewContext` for board ↔ activity navigation
-- **Day grouping** — Activities grouped by day with clear date headers
-- **15 activity type icons** — Visual icons for each activity type (created, updated, status changed, agent started, etc.)
-- **Filter bar** — Combinable filters: agent, type, taskId, date range (since/until)
-- **Filter dropdowns** — Populated from `GET /api/activity/filters` (distinct agents and types)
-- **Compact/detailed toggle** — Switch between compact summary view and detailed expanded view
-- **Infinite scroll** — Loads more activities on scroll via IntersectionObserver
-- **Real-time updates** — New activities appear live via WebSocket
-- **Agent field** — Activities include the `agent` field for filtering by which agent performed the action
+### Activity Page (v1.6.0)
+
+- **Full-width status history** — Redesigned layout removes activity feed column, status history spans full width
+- **Clickable task navigation** — Click any status history entry to open the task detail panel
+- **Color-coded status badges:**
+  - Agent statuses: `working`/`thinking` (green), `sub-agent` (purple), `idle` (gray), `error` (red)
+  - Task statuses: `todo` (slate), `in-progress` (amber), `blocked` (red), `done` (blue)
+- **Task title colors** — Title text colored to match the new status
+- **Unified timeline** — Shows both agent status changes AND task status changes
+- **Daily summary panel** — Retained above status history with utilization metrics
+- **Keyboard accessible** — Enter/Space to activate clickable entries
+
+### Core Features
+
+- **Dedicated page** — Accessible from header nav via `ViewContext` for board ↔ activity navigation
+- **Day grouping** — Status changes grouped by day with clear date headers
+- **Real-time updates** — New status changes appear live via WebSocket
+- **Agent field** — Entries include the `agent` field for attribution
 - **Capacity** — MAX_ACTIVITIES increased from 1,000 to 5,000
 
 ---
@@ -475,8 +521,38 @@ Real-time project metrics and telemetry.
 | ![Metrics overview](../assets/scr-metrics_.png)       | ![Token usage](../assets/scr-metrics_token_usage.png) |
 | ![Failed runs](../assets/scr-metrics_failed_runs.png) | ![Export metrics](../assets/scr-export_metrics.png)   |
 
-- **Time period selector** — View metrics for 24h, 7d, 30d, or all-time periods
-- **Project filter** — Drill into metrics for a specific project
+### Filter Bar (v1.6.0)
+
+- **Time preset pills** — Today, 3 Days, 1 Week, 1 Month, WTD, MTD, YTD, All
+- **Custom date range** — From/To date picker for precise filtering
+- **Project filter** — Dropdown to filter by project
+- **Export button** — Quick access to data export
+
+### Analytics API (v1.6.0)
+
+New endpoints for advanced metrics and visualization:
+
+| Endpoint                      | Description                                                         |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `GET /api/analytics/timeline` | Task execution timeline with parallelism snapshots                  |
+| `GET /api/analytics/metrics`  | Aggregate metrics (parallelism, throughput, lead time, utilization) |
+
+**Timeline endpoint returns:**
+
+- Start/end times from time tracking
+- Task assignments and status history
+- Parallelism snapshots (concurrent tasks over time)
+
+**Metrics endpoint returns:**
+
+- Parallelism factor (average concurrent tasks)
+- Throughput (tasks completed per period)
+- Lead time (creation to completion)
+- Agent utilization (working time per agent)
+- Efficiency metrics (tracked vs total time)
+
+### Core Features
+
 - **Task status overview** — Counts for each column with color-coded metric cards
 - **Trend indicators** — Up/down/flat trends with percentage change compared to previous period
 - **Blocked task breakdown** — Blocked task counts by category (feedback, technical snag, prerequisite, other)

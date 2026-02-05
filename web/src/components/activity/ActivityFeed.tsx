@@ -23,11 +23,11 @@ function getColumnColor(status: string): string {
     case 'todo':
       return 'bg-slate-500';
     case 'in-progress':
-      return 'bg-blue-500';
-    case 'blocked':
       return 'bg-amber-500';
+    case 'blocked':
+      return 'bg-red-500';
     case 'done':
-      return 'bg-green-500';
+      return 'bg-blue-500';
     default:
       return 'bg-gray-500';
   }
@@ -121,7 +121,7 @@ function StatusBadge({ status, isTaskStatus }: { status: string; isTaskStatus?: 
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center w-20 px-2 py-0.5 rounded text-xs font-medium text-white',
+        'inline-flex items-center justify-center w-[5.5rem] px-2 py-0.5 rounded text-xs font-medium text-white',
         colorClass
       )}
     >
@@ -253,16 +253,16 @@ function StatusHistoryPanel({ onTaskClick }: StatusHistoryPanelProps) {
                 // Color for task title based on entry type and status
                 const titleColor = isTaskStatus
                   ? entry.newStatus === 'done'
-                    ? 'text-green-500'
+                    ? 'text-blue-500'
                     : entry.newStatus === 'in-progress'
-                      ? 'text-blue-500'
+                      ? 'text-amber-500'
                       : entry.newStatus === 'blocked'
-                        ? 'text-amber-500'
+                        ? 'text-red-500'
                         : 'text-slate-500'
                   : entry.newStatus === 'working' || entry.newStatus === 'thinking'
                     ? 'text-green-500'
                     : entry.newStatus === 'sub-agent'
-                      ? 'text-blue-500'
+                      ? 'text-purple-500'
                       : entry.newStatus === 'error'
                         ? 'text-red-500'
                         : 'text-gray-500';
