@@ -13,6 +13,7 @@ import { registerAgentStatusCommands } from './commands/agent-status.js';
 import { registerProjectCommands } from './commands/projects.js';
 import { registerWorkflowCommands } from './commands/workflow.js';
 import { registerSetupCommands } from './commands/setup.js';
+import { registerUsageCommands } from './commands/usage.js';
 
 const program = new Command();
 
@@ -35,5 +36,6 @@ registerAgentStatusCommands(program);
 registerProjectCommands(program);
 registerWorkflowCommands(program);
 registerSetupCommands(program);
+registerUsageCommands(program);
 
 program.parse();
