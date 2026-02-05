@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { ArchiveSuggestionBanner } from './ArchiveSuggestionBanner';
 import FeatureErrorBoundary from '@/components/shared/FeatureErrorBoundary';
 import { useLiveAnnouncer } from '@/components/shared/LiveAnnouncer';
+import { useView } from '@/contexts/ViewContext';
 
 // Lazy-load Dashboard to split recharts + d3 (~800KB) out of main bundle
 const Dashboard = lazy(() =>
@@ -56,6 +57,38 @@ export function KanbanBoard() {
 
   const { selectedTaskId, setTasks, setOnOpenTask, setOnMoveTask } = useKeyboard();
   const { isSelecting, toggleSelecting } = useBulkActions();
+  const { pendingTaskId, clearPendingTask } = useView();
+
+  // Handle navigation from other views (e.g., Activity page clicking on a task)
+  useEffect(() => {
+    if (!pendingTaskId) return;
+
+    const openPendingTask = async () => {
+      // Try local task list first
+      const localTask = tasks?.find((t) => t.id === pendingTaskId);
+      if (localTask) {
+        setSelectedTask(localTask);
+        setDetailOpen(true);
+        clearPendingTask();
+        return;
+      }
+
+      // Fallback: fetch from API (task may be archived or filtered out)
+      try {
+        const { api } = await import('@/lib/api');
+        const fetchedTask = await api.tasks.get(pendingTaskId);
+        if (fetchedTask) {
+          setSelectedTask(fetchedTask);
+          setDetailOpen(true);
+        }
+      } catch {
+        // Task no longer exists — ignore silently
+      }
+      clearPendingTask();
+    };
+
+    openPendingTask();
+  }, [pendingTaskId, tasks, clearPendingTask]);
 
   // Sync filters to URL
   useEffect(() => {
@@ -206,7 +239,10 @@ export function KanbanBoard() {
 
       <FeatureErrorBoundary fallbackTitle="Board failed to render">
         <div className="grid grid-cols-5 gap-4">
-          <section className="col-span-4" aria-label={`Kanban board, ${filteredTasks.length} tasks`}>
+          <section
+            className="col-span-4"
+            aria-label={`Kanban board, ${filteredTasks.length} tasks`}
+          >
             {featureSettings.board.enableDragAndDrop ? (
               <DndContext
                 sensors={sensors}
@@ -251,15 +287,17 @@ export function KanbanBoard() {
             )}
           </section>
 
-          <BoardSidebar onTaskClick={(taskId) => {
-            const task = filteredTasks.find((t) => t.id === taskId);
-            if (task) {
-              handleTaskClick(task);
-            } else {
-              // Task may be archived or not on board — fire open-task event for API fallback
-              window.dispatchEvent(new CustomEvent('open-task', { detail: { taskId } }));
-            }
-          }} />
+          <BoardSidebar
+            onTaskClick={(taskId) => {
+              const task = filteredTasks.find((t) => t.id === taskId);
+              if (task) {
+                handleTaskClick(task);
+              } else {
+                // Task may be archived or not on board — fire open-task event for API fallback
+                window.dispatchEvent(new CustomEvent('open-task', { detail: { taskId } }));
+              }
+            }}
+          />
         </div>
 
         {featureSettings.board.showDashboard && (

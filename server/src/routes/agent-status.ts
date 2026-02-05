@@ -161,12 +161,27 @@ export function updateAgentStatus(update: Partial<AgentStatus>): AgentStatus {
 
   // Log status change to history if status actually changed
   if (update.status !== undefined && update.status !== previousStatus) {
+    // Derive task info: prefer activeTask, fallback to first activeAgent
+    let taskId = update.activeTask?.id || currentStatus.activeTask?.id;
+    let taskTitle = update.activeTask?.title || currentStatus.activeTask?.title;
+
+    // If no activeTask but we have activeAgents, use the first one's task info
+    if (!taskId && update.activeAgents && update.activeAgents.length > 0) {
+      const firstAgent = update.activeAgents[0];
+      taskId = firstAgent.taskId;
+      taskTitle = firstAgent.taskTitle;
+    } else if (!taskId && currentStatus.activeAgents && currentStatus.activeAgents.length > 0) {
+      const firstAgent = currentStatus.activeAgents[0];
+      taskId = firstAgent.taskId;
+      taskTitle = firstAgent.taskTitle;
+    }
+
     statusHistoryService
       .logStatusChange(
         previousStatus as HistoryStatusState,
         update.status as HistoryStatusState,
-        update.activeTask?.id || currentStatus.activeTask?.id,
-        update.activeTask?.title || currentStatus.activeTask?.title,
+        taskId,
+        taskTitle,
         update.subAgentCount ?? currentStatus.subAgentCount
       )
       .catch((err) => {
