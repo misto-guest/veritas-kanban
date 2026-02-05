@@ -35,6 +35,12 @@ const ArchivePage = lazy(() =>
   }))
 );
 
+const TemplatesPage = lazy(() =>
+  import('./components/templates/TemplatesPage').then((mod) => ({
+    default: mod.TemplatesPage,
+  }))
+);
+
 /** Renders the current view (board, activity feed, or backlog). */
 function MainContent() {
   const { view, setView, navigateToTask } = useView();
@@ -80,6 +86,20 @@ function MainContent() {
         }
       >
         <ArchivePage onBack={() => setView('board')} />
+      </Suspense>
+    );
+  }
+
+  if (view === 'templates') {
+    return (
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center py-16">
+            <span className="text-muted-foreground">Loading templates…</span>
+          </div>
+        }
+      >
+        <TemplatesPage onBack={() => setView('board')} />
       </Suspense>
     );
   }

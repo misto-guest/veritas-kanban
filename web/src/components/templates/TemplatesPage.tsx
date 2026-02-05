@@ -30,7 +30,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Plus, Trash2, Eye, Edit2, FileText } from 'lucide-react';
@@ -179,10 +178,10 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
               ) : (
                 <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredTemplates.map((template) => (
-                    <Card
+                    <div
                       key={template.id}
                       className={cn(
-                        'p-4 cursor-pointer transition-all hover:border-primary hover:shadow-md',
+                        'p-4 cursor-pointer transition-all border rounded-lg hover:border-primary hover:shadow-md',
                         selectedTemplate?.id === template.id && 'border-primary bg-primary/5'
                       )}
                       onClick={() => setSelectedTemplate(template)}
@@ -275,7 +274,7 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
                           </Button>
                         </div>
                       </div>
-                    </Card>
+                    </div>
                   ))}
                 </div>
               )}
@@ -333,7 +332,7 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[80vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <Card className="rounded-lg shadow-lg overflow-hidden">
+            <div className="rounded-lg shadow-lg overflow-hidden border bg-card">
               <div className="p-6 overflow-y-auto max-h-[80vh]">
                 <TemplatePreviewPanel template={selectedTemplate} />
                 <div className="mt-6 flex justify-end">
@@ -342,7 +341,7 @@ export function TemplatesPage({ onBack }: TemplatesPageProps) {
                   </Button>
                 </div>
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       )}

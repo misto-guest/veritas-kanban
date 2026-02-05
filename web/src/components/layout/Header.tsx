@@ -1,4 +1,14 @@
-import { Plus, Settings, Search, ListOrdered, Archive, Inbox, Sun, Moon } from 'lucide-react';
+import {
+  Plus,
+  Settings,
+  Search,
+  ListOrdered,
+  Archive,
+  Inbox,
+  Sun,
+  Moon,
+  FileText,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
 import { SettingsDialog } from '@/components/settings/SettingsDialog';
@@ -97,6 +107,15 @@ export function Header() {
               <Archive className="h-4 w-4" aria-hidden="true" />
             </Button>
             <Button
+              variant={view === 'templates' ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => setView(view === 'templates' ? 'board' : 'templates')}
+              aria-label="Templates"
+              title="Templates"
+            >
+              <FileText className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
               variant="ghost"
               size="icon"
               onClick={() => setSettingsOpen(true)}
@@ -122,7 +141,9 @@ export function Header() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+              onClick={() =>
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
+              }
               aria-label="Command palette"
               title="Command palette (⌘K)"
               className="gap-1.5 text-muted-foreground"
