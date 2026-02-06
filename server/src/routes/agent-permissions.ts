@@ -52,7 +52,7 @@ router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const service = getAgentPermissionService();
-    const config = await service.getPermissions(req.params.id);
+    const config = await service.getPermissions(String(req.params.id));
     res.json(config);
   })
 );
@@ -68,7 +68,7 @@ router.put(
     });
     const { level } = schema.parse(req.body);
     const service = getAgentPermissionService();
-    const config = await service.setLevel(req.params.id, level);
+    const config = await service.setLevel(String(req.params.id), level);
     res.json(config);
   })
 );
@@ -89,7 +89,7 @@ router.patch(
     });
     const update = schema.parse(req.body);
     const service = getAgentPermissionService();
-    const config = await service.updatePermissions(req.params.id, update);
+    const config = await service.updatePermissions(String(req.params.id), update);
     res.json(config);
   })
 );
@@ -142,7 +142,7 @@ router.post(
     });
     const { decision, reviewedBy } = schema.parse(req.body);
     const service = getAgentPermissionService();
-    const result = await service.reviewApproval(req.params.id, decision, reviewedBy);
+    const result = await service.reviewApproval(String(req.params.id), decision, reviewedBy);
     if (!result) throw new NotFoundError('Approval request not found');
     res.json(result);
   })

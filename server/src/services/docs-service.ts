@@ -8,9 +8,9 @@
  */
 
 import { createLogger } from '../lib/logger.js';
-import { getStorageBase } from '../storage/fs-helpers.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
 
 const log = createLogger('docs');
 
@@ -60,7 +60,7 @@ class DocsService {
 
   constructor() {
     // Default to <storage>/../docs, configurable via VK_DOCS_DIR
-    this.docsRoot = process.env.VK_DOCS_DIR || path.join(getStorageBase(), '..', 'docs');
+    this.docsRoot = process.env.VK_DOCS_DIR || path.join(DATA_DIR, '..', 'docs');
   }
 
   /**

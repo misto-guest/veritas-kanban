@@ -124,7 +124,7 @@ router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const service = getErrorLearningService();
-    const analysis = await service.getAnalysis(req.params.id);
+    const analysis = await service.getAnalysis(String(req.params.id));
     if (!analysis) throw new NotFoundError('Error analysis not found');
     res.json(analysis);
   })
@@ -139,7 +139,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const update = updateAnalysisSchema.parse(req.body);
     const service = getErrorLearningService();
-    const analysis = await service.updateAnalysis(req.params.id, update);
+    const analysis = await service.updateAnalysis(String(req.params.id), update);
     if (!analysis) throw new NotFoundError('Error analysis not found');
     res.json(analysis);
   })

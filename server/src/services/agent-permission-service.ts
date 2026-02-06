@@ -11,9 +11,9 @@
  */
 
 import { createLogger } from '../lib/logger.js';
-import { getStorageBase } from '../storage/fs-helpers.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
 
 const log = createLogger('agent-permissions');
 
@@ -91,11 +91,11 @@ class AgentPermissionService {
   private loaded = false;
 
   private get permissionsPath(): string {
-    return path.join(getStorageBase(), 'agent-permissions.json');
+    return path.join(DATA_DIR, 'agent-permissions.json');
   }
 
   private get approvalsPath(): string {
-    return path.join(getStorageBase(), 'approval-requests.json');
+    return path.join(DATA_DIR, 'approval-requests.json');
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -301,7 +301,7 @@ class AgentPermissionService {
 
     let results = this.approvals.filter((a) => a.status === 'pending');
     if (filters?.agentId) {
-      results = results.filter((a) => a.agentId === filters.agentId.toLowerCase());
+      results = results.filter((a) => a.agentId === filters.agentId!.toLowerCase());
     }
     return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }

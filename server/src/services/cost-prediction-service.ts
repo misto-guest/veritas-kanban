@@ -298,7 +298,7 @@ class CostPredictionService {
   ): Promise<{ avgCost: number; sampleSize: number }> {
     try {
       const telemetry = getTelemetryService();
-      const events = await telemetry.query({
+      const events = await telemetry.getEvents({
         type: 'run.tokens',
         limit: 500,
       });
@@ -310,7 +310,7 @@ class CostPredictionService {
       // Filter by type/project if available and calculate average cost per task
       const taskCosts = new Map<string, number>();
       for (const event of events) {
-        const e = event as Record<string, unknown>;
+        const e = event as unknown as Record<string, unknown>;
         const taskId = e.taskId as string;
         if (!taskId) continue;
 
@@ -341,7 +341,7 @@ class CostPredictionService {
 
     try {
       const telemetry = getTelemetryService();
-      const events = await telemetry.query({
+      const events = await telemetry.getEvents({
         type: 'run.tokens',
         limit: 200,
       });
@@ -352,7 +352,7 @@ class CostPredictionService {
       const otherCosts: number[] = [];
 
       for (const event of events) {
-        const e = event as Record<string, unknown>;
+        const e = event as unknown as Record<string, unknown>;
         const inputTokens = (e.inputTokens as number) || 0;
         const outputTokens = (e.outputTokens as number) || 0;
         const cost = (e.cost as number) || inputTokens * 0.00001 + outputTokens * 0.00003;

@@ -15,9 +15,9 @@
  */
 
 import { createLogger } from '../lib/logger.js';
-import { getStorageBase } from '../storage/fs-helpers.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
 
 const log = createLogger('lifecycle-hooks');
 
@@ -205,11 +205,11 @@ class LifecycleHooksService {
   }
 
   private get storagePath(): string {
-    return path.join(getStorageBase(), 'lifecycle-hooks.json');
+    return path.join(DATA_DIR, 'lifecycle-hooks.json');
   }
 
   private get executionsPath(): string {
-    return path.join(getStorageBase(), 'hook-executions.json');
+    return path.join(DATA_DIR, 'hook-executions.json');
   }
 
   private async ensureLoaded(): Promise<void> {

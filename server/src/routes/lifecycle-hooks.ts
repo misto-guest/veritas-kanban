@@ -50,9 +50,9 @@ router.get(
   asyncHandler(async (req, res) => {
     const service = getLifecycleHooksService();
     const executions = await service.getExecutions({
-      hookId: req.query.hookId as string,
-      taskId: req.query.taskId as string,
-      limit: req.query.limit ? Number(req.query.limit) : 50,
+      hookId: String(req.query.hookId || ""),
+      taskId: String(req.query.taskId || ""),
+      limit: req.query.limit ? Number(String(req.query.limit)) : 50,
     });
     res.json(executions);
   })
@@ -99,7 +99,7 @@ router.patch(
     });
     const update = schema.parse(req.body);
     const service = getLifecycleHooksService();
-    const hook = await service.updateHook(req.params.id, update);
+    const hook = await service.updateHook(String(req.params.id), update);
     if (!hook) throw new NotFoundError('Hook not found');
     res.json(hook);
   })
@@ -112,7 +112,7 @@ router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
     const service = getLifecycleHooksService();
-    const success = await service.deleteHook(req.params.id);
+    const success = await service.deleteHook(String(req.params.id));
     if (!success) throw new NotFoundError('Hook not found');
     res.json({ success: true });
   })

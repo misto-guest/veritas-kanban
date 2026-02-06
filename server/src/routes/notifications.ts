@@ -23,7 +23,7 @@ const router: RouterType = Router();
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const agent = req.query.agent as string;
+    const agent = String(req.query.agent || "");
     if (!agent) {
       return res.status(400).json({ error: 'agent query parameter required' });
     }
@@ -32,8 +32,8 @@ router.get(
     const notifications = await service.getNotifications({
       agent,
       undelivered: req.query.undelivered === 'true',
-      taskId: req.query.taskId as string,
-      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      taskId: String(req.query.taskId || ""),
+      limit: req.query.limit ? Number(String(req.query.limit)) : undefined,
     });
 
     res.json(notifications);
@@ -59,7 +59,7 @@ router.get(
   '/subscriptions/:taskId',
   asyncHandler(async (req, res) => {
     const service = getNotificationService();
-    const subs = await service.getSubscriptions(req.params.taskId);
+    const subs = await service.getSubscriptions(String(req.params.taskId));
     res.json(subs);
   })
 );
@@ -92,7 +92,7 @@ router.post(
   '/:id/delivered',
   asyncHandler(async (req, res) => {
     const service = getNotificationService();
-    const success = await service.markDelivered(req.params.id);
+    const success = await service.markDelivered(String(req.params.id));
     if (!success) throw new NotFoundError('Notification not found');
     res.json({ success: true });
   })

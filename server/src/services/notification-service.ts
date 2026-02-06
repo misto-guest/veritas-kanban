@@ -6,9 +6,10 @@
  */
 
 import { createLogger } from '../lib/logger.js';
-import { getStorageBase } from '../storage/fs-helpers.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
 
 const log = createLogger('notifications');
 
@@ -66,17 +67,17 @@ export function parseMentions(text: string): string[] {
 
 // ─── Service ─────────────────────────────────────────────────────
 
-class NotificationService {
+export class NotificationService {
   private notifications: Notification[] = [];
   private subscriptions: ThreadSubscription[] = [];
   private loaded = false;
 
   private get notificationsPath(): string {
-    return path.join(getStorageBase(), 'notifications.json');
+    return path.join(DATA_DIR, 'notifications.json');
   }
 
   private get subscriptionsPath(): string {
-    return path.join(getStorageBase(), 'thread-subscriptions.json');
+    return path.join(DATA_DIR, 'thread-subscriptions.json');
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -262,6 +263,35 @@ class NotificationService {
 
     if (count > 0) await this.saveNotifications();
     return count;
+  }
+
+  /**
+   * Create a notification directly (backward compat with failure-alert-service).
+   */
+  async createNotification(params: {
+    type?: string;
+    title?: string;
+    message: string;
+    taskId?: string;
+    taskTitle?: string;
+    project?: string;
+  }): Promise<Notification> {
+    await this.ensureLoaded();
+
+    const notification: Notification = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      taskId: params.taskId || 'system',
+      targetAgent: 'system',
+      fromAgent: 'system',
+      content: params.message,
+      type: 'mention',
+      delivered: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.notifications.push(notification);
+    await this.saveNotifications();
+    return notification;
   }
 
   /**

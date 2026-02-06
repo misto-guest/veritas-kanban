@@ -15,9 +15,9 @@
 import { getTaskService } from './task-service.js';
 import { getTelemetryService } from './telemetry-service.js';
 import { createLogger } from '../lib/logger.js';
-import { getStorageBase } from '../storage/fs-helpers.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
 
 const log = createLogger('error-learning');
 
@@ -104,7 +104,7 @@ class ErrorLearningService {
   private loaded = false;
 
   private get storagePath(): string {
-    return path.join(getStorageBase(), 'error-analyses.json');
+    return path.join(DATA_DIR, 'error-analyses.json');
   }
 
   private async ensureLoaded(): Promise<void> {

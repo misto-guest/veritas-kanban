@@ -8,9 +8,9 @@
  */
 
 import { createLogger } from '../lib/logger.js';
-import { getStorageBase } from '../storage/fs-helpers.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
 
 const log = createLogger('deliverables');
 
@@ -73,11 +73,11 @@ class ScheduledDeliverablesService {
   private loaded = false;
 
   private get deliverablesPath(): string {
-    return path.join(getStorageBase(), 'scheduled-deliverables.json');
+    return path.join(DATA_DIR, 'scheduled-deliverables.json');
   }
 
   private get runsPath(): string {
-    return path.join(getStorageBase(), 'deliverable-runs.json');
+    return path.join(DATA_DIR, 'deliverable-runs.json');
   }
 
   private async ensureLoaded(): Promise<void> {

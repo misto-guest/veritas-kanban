@@ -107,7 +107,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const service = getPdfReportService();
     const reports = await service.listReports(
-      req.query.limit ? Number(req.query.limit) : undefined
+      req.query.limit ? Number(String(req.query.limit)) : undefined
     );
     res.json(reports);
   })
@@ -120,7 +120,7 @@ router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const service = getPdfReportService();
-    const report = await service.getReport(req.params.id);
+    const report = await service.getReport(String(req.params.id));
     if (!report) throw new NotFoundError('Report not found');
     res.json(report);
   })
@@ -133,7 +133,7 @@ router.get(
   '/:id/html',
   asyncHandler(async (req, res) => {
     const service = getPdfReportService();
-    const report = await service.getReport(req.params.id);
+    const report = await service.getReport(String(req.params.id));
     if (!report) throw new NotFoundError('Report not found');
 
     try {

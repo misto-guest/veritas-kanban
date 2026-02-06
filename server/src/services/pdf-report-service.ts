@@ -12,9 +12,9 @@
  */
 
 import { createLogger } from '../lib/logger.js';
-import { getStorageBase } from '../storage/fs-helpers.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
 
 const log = createLogger('pdf-reports');
 
@@ -188,15 +188,15 @@ class PdfReportService {
   private loaded = false;
 
   private get configPath(): string {
-    return path.join(getStorageBase(), 'report-brand.json');
+    return path.join(DATA_DIR, 'report-brand.json');
   }
 
   private get reportsPath(): string {
-    return path.join(getStorageBase(), 'generated-reports.json');
+    return path.join(DATA_DIR, 'generated-reports.json');
   }
 
   private get outputDir(): string {
-    return path.join(getStorageBase(), '..', 'docs', 'reports');
+    return path.join(DATA_DIR, '..', 'docs', 'reports');
   }
 
   private async ensureLoaded(): Promise<void> {

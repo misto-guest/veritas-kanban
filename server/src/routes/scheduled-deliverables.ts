@@ -24,7 +24,7 @@ router.get(
     const service = getScheduledDeliverablesService();
     const deliverables = await service.list({
       enabled: req.query.enabled === 'true' ? true : req.query.enabled === 'false' ? false : undefined,
-      agent: req.query.agent as string,
+      agent: String(req.query.agent || ""),
       tag: req.query.tag as string,
     });
     res.json(deliverables);
@@ -56,7 +56,7 @@ router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const service = getScheduledDeliverablesService();
-    const result = await service.get(req.params.id);
+    const result = await service.get(String(req.params.id));
     if (!result) throw new NotFoundError('Deliverable not found');
     res.json(result);
   })
@@ -78,7 +78,7 @@ router.patch(
     });
     const update = schema.parse(req.body);
     const service = getScheduledDeliverablesService();
-    const result = await service.update(req.params.id, update);
+    const result = await service.update(String(req.params.id), update);
     if (!result) throw new NotFoundError('Deliverable not found');
     res.json(result);
   })
@@ -88,7 +88,7 @@ router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
     const service = getScheduledDeliverablesService();
-    const success = await service.delete(req.params.id);
+    const success = await service.delete(String(req.params.id));
     if (!success) throw new NotFoundError('Deliverable not found');
     res.json({ success: true });
   })
@@ -106,7 +106,7 @@ router.post(
     });
     const data = schema.parse(req.body);
     const service = getScheduledDeliverablesService();
-    const run = await service.recordRun({ ...data, deliverableId: req.params.id });
+    const run = await service.recordRun({ ...data, deliverableId: String(req.params.id) });
     res.status(201).json(run);
   })
 );
@@ -116,8 +116,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const service = getScheduledDeliverablesService();
     const runs = await service.getRuns(
-      req.params.id,
-      req.query.limit ? Number(req.query.limit) : undefined
+      String(req.params.id),
+      req.query.limit ? Number(String(req.query.limit)) : undefined
     );
     res.json(runs);
   })
