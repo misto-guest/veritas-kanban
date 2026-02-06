@@ -12,6 +12,8 @@ Complete feature reference for Veritas Kanban. For a quick overview, see the [RE
 - [Task Templates](#task-templates-v160)
 - [Code Workflow](#code-workflow)
 - [AI Agent Integration](#ai-agent-integration)
+- [Multi-Agent System (v2.0)](#multi-agent-system-v200)
+- [Lifecycle Automation (v2.0)](#lifecycle-automation-v200)
 - [GitHub Issues Sync](#github-issues-sync)
 - [Activity Feed](#activity-feed)
 - [Daily Standup](#daily-standup)
@@ -200,6 +202,84 @@ First-class support for autonomous coding agents.
 - **Platform-agnostic REST API** — Any platform that can make HTTP calls can drive the full agent lifecycle
 - **Automation tasks** — Separate automation task type with pending/running/complete lifecycle, session key tracking, and sub-agent spawning
 - **Failure alerts** — Dedicated failure alert service for agent run failures
+
+---
+
+## Multi-Agent System (v2.0.0)
+
+Full multi-agent orchestration platform with service discovery, assignment, permissions, and communication.
+
+### Agent Registry (#52)
+
+Service discovery and liveness tracking for AI agents.
+
+- **Self-registration** — Agents register via `POST /api/agents/register` with name, model, role, capabilities
+- **Heartbeat tracking** — Agents send periodic heartbeats; marked offline after configurable timeout (default 5 min)
+- **Status lifecycle** — Online → Busy → Idle → Offline with automatic transitions
+- **Capabilities declaration** — Agents declare what they can do (code-review, research, testing, etc.)
+- **Stats endpoint** — `GET /api/agents/register/stats` returns total, online, busy, idle, offline counts
+- **File-based persistence** — Registry stored in `.veritas-kanban/agent-registry.json`
+
+| Endpoint                                | Method | Description                 |
+| --------------------------------------- | ------ | --------------------------- |
+| `/api/agents/register`                  | POST   | Register or update an agent |
+| `/api/agents/register`                  | GET    | List all registered agents  |
+| `/api/agents/register/stats`            | GET    | Registry statistics         |
+| `/api/agents/register/:id`              | DELETE | Deregister an agent         |
+| `/api/agents/register/:id/heartbeat`    | POST   | Send heartbeat              |
+| `/api/agents/register/:id/capabilities` | GET    | Get agent capabilities      |
+
+### Multi-Agent Dashboard Sidebar (#28)
+
+Real-time agent monitoring in the board sidebar.
+
+- **Live status cards** — Expandable cards for each registered agent showing status, model, role, last heartbeat
+- **Color-coded indicators** — Green (working), purple (sub-agent), gray (idle), red (error)
+- **Stats summary bar** — Total, online, busy, idle, offline counts at a glance
+- **Auto-refresh** — Polls registry for live updates
+
+### Multi-Agent Task Assignment (#29)
+
+Assign multiple agents to a single task.
+
+- **`agents[]` field** — Tasks support an array of assigned agents
+- **Color-coded chips** — Agent assignments displayed as colored chips in task detail and board cards
+- **Shared helpers** — `@veritas-kanban/shared` utilities for agent color assignment and display
+
+### @Mention Notifications (#30)
+
+Directed agent communication in task comments.
+
+- **@agent-name parsing** — Comments parsed for @mentions targeting registered agents
+- **Thread subscriptions** — Agents auto-subscribed to tasks they're mentioned in
+- **Delivery tracking** — Track which notifications have been delivered to which agents
+
+### Agent Permission Levels (#31)
+
+Role-based autonomy control for multi-agent teams.
+
+- **Three tiers** — Intern (requires approval), Specialist (autonomous within scope), Lead (full autonomy)
+- **Approval workflows** — Configurable approval requirements per permission level
+- **API enforcement** — Permission checks on agent actions, not just UI display
+
+### Error Learning (#91)
+
+Structured failure analysis to prevent recurring issues.
+
+- **Failure recording** — Agent failures stored with structured metadata (error type, context, resolution)
+- **Similarity search** — Find similar past failures to suggest fixes
+- **Stats API** — Aggregate error patterns and frequency analysis
+- **Inspired by** @nateherk's Klouse dashboard concept ("spin up agents to analyze what broke")
+
+### Documentation Freshness (#74)
+
+Automated staleness detection for project documentation.
+
+- **Freshness headers** — YAML frontmatter with `fresh-days`, `owner`, `last-verified` fields
+- **Steward workflow** — Assigned doc owners responsible for periodic review
+- **Staleness API** — Query which docs need review based on freshness thresholds
+- **3-phase automation** — Manual → scheduled checks → CI integration
+- **Inspired by** @mvoutov's BoardKit Orchestrator ("stale docs = hallucinating AI")
 
 ---
 
@@ -521,6 +601,35 @@ Real-time project metrics and telemetry.
 | ![Metrics overview](../assets/scr-metrics_.png)       | ![Token usage](../assets/scr-metrics_token_usage.png) |
 | ![Failed runs](../assets/scr-metrics_failed_runs.png) | ![Export metrics](../assets/scr-export_metrics.png)   |
 
+### Dashboard Widgets (v2.0.0)
+
+- **Widget toggles** (#92) — Show/hide individual widgets via settings gear; preferences persisted in localStorage
+- **Where Time Went** (#57) — Time breakdown by project, sourced from task-cost telemetry with color-coded bars
+- **Activity Clock** (#58) — 24-hour donut chart showing agent work distribution, sourced from status-history transitions
+- **Hourly Activity Chart** (#59) — Bar chart with per-hour event counts from status-history
+- **Wall Time Toggle** (#60) — Total Agent Time + Average Run Duration with explanatory info tooltips
+- **Session Metrics** (#61) — Session count, success rate, completed/failed/abandoned tracking
+- **Markdown rendering** (#63) — Rich markdown in task descriptions and comments via MarkdownText component
+- **Cost prediction** (#54) — Multi-factor cost estimation model (tokens, compute, overhead) for task budgeting
+- **Timezone-aware metrics** — Server reports timezone in response `meta`; clients send `?tz=<offset>` for cross-region display
+
+### Task Lifecycle Hooks (v2.0.0)
+
+Event-driven automation for task status changes (#72).
+
+- **7 built-in hooks** — subtask-gate, assignee-required, blocked-reason, done-checklist, auto-archive, time-tracking, notification
+- **8 lifecycle events** — created, status-changed, assigned, commented, time-started, time-stopped, subtask-completed, archived
+- **Custom hooks API** — Register custom hooks that fire on lifecycle events
+- **Hook configuration** — Enable/disable hooks, set parameters, define conditions
+
+| Endpoint            | Method | Description                     |
+| ------------------- | ------ | ------------------------------- |
+| `/api/hooks`        | GET    | List all hooks                  |
+| `/api/hooks`        | POST   | Register custom hook            |
+| `/api/hooks/:id`    | PUT    | Update hook configuration       |
+| `/api/hooks/:id`    | DELETE | Remove hook                     |
+| `/api/hooks/events` | GET    | List available lifecycle events |
+
 ### Filter Bar (v1.6.0)
 
 - **Time preset pills** — Today, 3 Days, 1 Week, 1 Month, WTD, MTD, YTD, All
@@ -624,38 +733,45 @@ RESTful API designed for both human and AI agent consumption.
 
 ### Endpoints
 
-| Route Prefix                    | Description                                                   |
-| ------------------------------- | ------------------------------------------------------------- |
-| `/api/v1/tasks`                 | Task CRUD, listing, reordering                                |
-| `/api/v1/tasks/archived`        | Archive listing, restore                                      |
-| `/api/v1/tasks/:id/time`        | Time tracking (start, stop, entries)                          |
-| `/api/v1/tasks/:id/comments`    | Comments (add, edit, delete)                                  |
-| `/api/v1/tasks/:id/subtasks`    | Subtask management                                            |
-| `/api/v1/tasks/:id/attachments` | File attachments (upload, download, delete)                   |
-| `/api/v1/config`                | Board configuration                                           |
-| `/api/v1/settings`              | Feature settings                                              |
-| `/api/v1/agents`                | Agent start, stop, status, attempts, completion               |
-| `/api/v1/agent/status`          | Global agent status indicator                                 |
-| `/api/v1/automation`            | Automation task lifecycle                                     |
-| `/api/v1/diff`                  | Diff summaries and file diffs                                 |
-| `/api/v1/conflicts`             | Merge conflict status and resolution                          |
-| `/api/v1/github`                | GitHub PR creation and Issues sync                            |
-| `/api/v1/github/sync`           | GitHub Issues sync (trigger, status, config, mappings)        |
-| `/api/v1/summary`               | Project summary, memory-formatted summary, and standup        |
-| `/api/v1/summary/standup`       | Daily standup summary (json, markdown, text)                  |
-| `/api/v1/notifications`         | Notification CRUD and Teams-formatted pending                 |
-| `/api/v1/templates`             | Task template management                                      |
-| `/api/v1/task-types`            | Custom task type management                                   |
-| `/api/v1/projects`              | Project list management                                       |
-| `/api/v1/sprints`               | Sprint list management                                        |
-| `/api/v1/activity`              | Activity log with filtering (agent, type, taskId, date range) |
-| `/api/v1/activity/filters`      | Distinct agents and types for activity filter dropdowns       |
-| `/api/v1/status-history`        | Task status history and daily summary                         |
-| `/api/v1/preview`               | Markdown preview rendering                                    |
-| `/api/v1/telemetry`             | Telemetry event recording and querying                        |
-| `/api/v1/metrics`               | Dashboard metrics and task-level metrics                      |
-| `/api/v1/traces`                | Request traces                                                |
-| `/api/v1/digest`                | Daily digest generation                                       |
+| Route Prefix                     | Description                                                   |
+| -------------------------------- | ------------------------------------------------------------- |
+| `/api/v1/tasks`                  | Task CRUD, listing, reordering                                |
+| `/api/v1/tasks/archived`         | Archive listing, restore                                      |
+| `/api/v1/tasks/:id/time`         | Time tracking (start, stop, entries)                          |
+| `/api/v1/tasks/:id/comments`     | Comments (add, edit, delete)                                  |
+| `/api/v1/tasks/:id/subtasks`     | Subtask management                                            |
+| `/api/v1/tasks/:id/attachments`  | File attachments (upload, download, delete)                   |
+| `/api/v1/config`                 | Board configuration                                           |
+| `/api/v1/settings`               | Feature settings                                              |
+| `/api/v1/agents`                 | Agent start, stop, status, attempts, completion               |
+| `/api/v1/agent/status`           | Global agent status indicator                                 |
+| `/api/v1/automation`             | Automation task lifecycle                                     |
+| `/api/v1/diff`                   | Diff summaries and file diffs                                 |
+| `/api/v1/conflicts`              | Merge conflict status and resolution                          |
+| `/api/v1/github`                 | GitHub PR creation and Issues sync                            |
+| `/api/v1/github/sync`            | GitHub Issues sync (trigger, status, config, mappings)        |
+| `/api/v1/summary`                | Project summary, memory-formatted summary, and standup        |
+| `/api/v1/summary/standup`        | Daily standup summary (json, markdown, text)                  |
+| `/api/v1/notifications`          | Notification CRUD and Teams-formatted pending                 |
+| `/api/v1/templates`              | Task template management                                      |
+| `/api/v1/task-types`             | Custom task type management                                   |
+| `/api/v1/projects`               | Project list management                                       |
+| `/api/v1/sprints`                | Sprint list management                                        |
+| `/api/v1/activity`               | Activity log with filtering (agent, type, taskId, date range) |
+| `/api/v1/activity/filters`       | Distinct agents and types for activity filter dropdowns       |
+| `/api/v1/status-history`         | Task status history and daily summary                         |
+| `/api/v1/preview`                | Markdown preview rendering                                    |
+| `/api/v1/telemetry`              | Telemetry event recording and querying                        |
+| `/api/v1/metrics`                | Dashboard metrics and task-level metrics                      |
+| `/api/v1/traces`                 | Request traces                                                |
+| `/api/v1/digest`                 | Daily digest generation                                       |
+| `/api/v1/agents/register`        | Agent registry (register, list, heartbeat, stats, deregister) |
+| `/api/v1/agents/permissions`     | Agent permission levels and approval workflows                |
+| `/api/v1/hooks`                  | Task lifecycle hooks (list, create, update, delete, events)   |
+| `/api/v1/errors`                 | Error learning (record, search, stats)                        |
+| `/api/v1/docs`                   | Documentation freshness (list, staleness, verify)             |
+| `/api/v1/reports`                | PDF report generation                                         |
+| `/api/v1/scheduled-deliverables` | Scheduled deliverables view                                   |
 
 ### Authentication Methods
 
@@ -685,7 +801,9 @@ All responses use a standardized envelope format:
   "data": { ... },
   "meta": {
     "timestamp": "2026-02-01T00:00:00.000Z",
-    "requestId": "uuid-v4"
+    "requestId": "uuid-v4",
+    "timezone": "UTC-06:00",
+    "utcOffset": -6
   }
 }
 ```
@@ -852,4 +970,4 @@ Working toward WCAG 2.1 AA compliance.
 
 ---
 
-_Last updated: 2026-02-01 · [Back to README](../README.md)_
+_Last updated: 2026-02-06 · [Back to README](../README.md)_

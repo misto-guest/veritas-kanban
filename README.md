@@ -151,7 +151,7 @@ Open [http://localhost:3000](http://localhost:3000) — that's it. The board aut
 - **Session Metrics** — Session count, success rate, completion tracking (NEW — v2.0)
 - **Markdown rendering** — Rich markdown in task descriptions and comments (NEW — v2.0)
 - **Timezone-aware metrics** — Server reports local timezone; clients can request metrics in any timezone via `?tz=` (NEW — v2.0)
-- **Analytics API** — Timeline visualization and aggregate metrics (parallelism, throughput, lead time) (NEW — v1.6)
+- **Analytics API** — Timeline visualization and aggregate metrics (parallelism, throughput, lead time)
 
 ### 🗂️ Organization
 
@@ -320,7 +320,7 @@ Manage your entire task lifecycle with two commands.
 cd cli && npm link
 ```
 
-### Setup & Onboarding (NEW — v1.5)
+### Setup & Onboarding
 
 ```bash
 vk setup                         # Guided environment check + sample task
@@ -330,7 +330,7 @@ vk setup --json                  # Machine-readable output
 
 Validates Node version, server health, API auth, and optionally creates a welcome task to get you started.
 
-### Workflow Commands (NEW — v1.4)
+### Workflow Commands
 
 The `vk begin` and `vk done` commands replace multi-step API workflows with single commands. Inspired by Boris Cherny's (Claude Code creator) philosophy: _"automate everything you do twice."_
 
@@ -646,9 +646,10 @@ See the [open milestones](https://github.com/BradGroux/veritas-kanban/milestones
 ### Backlog
 
 - [WCAG 2.1 AA accessibility](https://github.com/BradGroux/veritas-kanban/issues/1) — Full keyboard navigation, screen reader support, color contrast
-- [Dashboard widget toggles](https://github.com/BradGroux/veritas-kanban/issues/92) — Show/hide individual dashboard widgets with localStorage persistence
 
 ### Shipped in v2.0.0
+
+- ~~[Dashboard widget toggles](https://github.com/BradGroux/veritas-kanban/issues/92)~~ — Show/hide individual dashboard widgets with localStorage persistence
 
 - ~~[Multi-agent dashboard sidebar](https://github.com/BradGroux/veritas-kanban/issues/28)~~ — Live agent status, expandable cards, registry integration
 - ~~[Multi-agent task assignment](https://github.com/BradGroux/veritas-kanban/issues/29)~~ — Multiple agents per task, color-coded chips

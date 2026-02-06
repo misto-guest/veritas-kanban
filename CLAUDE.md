@@ -2,7 +2,7 @@
 
 This file defines project-specific rules, context, and lessons learned for AI agents working on Veritas Kanban. Update it after every mistake, discovery, or workflow change.
 
-> **Last updated:** 2026-02-04  
+> **Last updated:** 2026-02-06 (v2.0.0)  
 > **Freshness check:** Review monthly or after major releases
 
 ---
@@ -12,7 +12,7 @@ This file defines project-specific rules, context, and lessons learned for AI ag
 **Veritas Kanban** is an open-source AI-native task management system. It's designed for humans + AI agents to collaborate on work through a shared board, CLI, and API.
 
 - **Primary language:** TypeScript (strict mode)
-- **Monorepo:** pnpm workspaces — `server/`, `web/`, `cli/`, `shared/`
+- **Monorepo:** pnpm workspaces — `server/`, `web/`, `cli/`, `shared/`, `mcp/`
 - **Build:** Node 22+, pnpm 9+
 - **Test:** Vitest (server), React Testing Library (web)
 - **Style:** ESLint + Prettier, conventional commits
@@ -71,7 +71,18 @@ This file defines project-specific rules, context, and lessons learned for AI ag
 
 - ❌ Imported `fs` directly in service files — breaks storage abstraction
 - ❌ Added polling when WebSocket hook existed — use `useRealtimeAgentStatus`
+- ❌ Frontend interface didn't match server response (e.g., `totalAgents` vs `total` in registry stats)
 - ✅ Check for existing hooks/services before creating new ones
+- ✅ Server response format is source of truth — frontend interfaces must match exactly
+
+### Multi-Agent (v2.0)
+
+- Agent names use ALL CAPS for acronyms (VERITAS, TARS, CASE, K-2SO, R2-D2, MAX)
+- Agent registry is file-based at `.veritas-kanban/agent-registry.json`
+- Heartbeat timeout: 5 min (configurable). Stale check interval: 1 min
+- Activity data uses `status-history` (not `activity.json`) as source of truth
+- Timezone: server uses local time; clients send `?tz=<offset>` for cross-region display
+- Dashboard widgets: use `onMutate` for optimistic updates (archive, status changes)
 
 ### Testing
 
@@ -107,18 +118,21 @@ This file defines project-specific rules, context, and lessons learned for AI ag
 
 ## File Locations
 
-| What             | Where                  |
-| ---------------- | ---------------------- |
-| API routes       | `server/src/routes/`   |
-| Services         | `server/src/services/` |
-| Schemas          | `server/src/schemas/`  |
-| Storage          | `server/src/storage/`  |
-| React components | `web/src/components/`  |
-| Zustand stores   | `web/src/stores/`      |
-| CLI commands     | `cli/src/commands/`    |
-| Shared types     | `shared/src/`          |
-| Prompts          | `prompt-registry/`     |
-| SOPs             | `docs/SOP-*.md`        |
+| What             | Where                                 |
+| ---------------- | ------------------------------------- |
+| API routes       | `server/src/routes/`                  |
+| Services         | `server/src/services/`                |
+| Schemas          | `server/src/schemas/`                 |
+| Storage          | `server/src/storage/`                 |
+| React components | `web/src/components/`                 |
+| Zustand stores   | `web/src/stores/`                     |
+| CLI commands     | `cli/src/commands/`                   |
+| Shared types     | `shared/src/`                         |
+| MCP server       | `mcp/src/`                            |
+| Prompts          | `prompt-registry/`                    |
+| SOPs             | `docs/SOP-*.md`                       |
+| Agent registry   | `.veritas-kanban/agent-registry.json` |
+| Telemetry events | `.veritas-kanban/telemetry/`          |
 
 ---
 

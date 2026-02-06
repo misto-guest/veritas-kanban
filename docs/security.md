@@ -262,6 +262,11 @@ Check that `VERITAS_AUTH_LOCALHOST_BYPASS=true` is set, or provide an API key.
 
 ## Changelog
 
+- **v2.0.0** (2026-02-06): Multi-agent security
+  - Agent permission levels (Intern/Specialist/Lead) with enforcement
+  - Agent registry with heartbeat-based liveness tracking
+  - MCP SDK patched to ^1.26.0 (GHSA-345p-7cg4-v4c7)
+  - Rate limiting documentation (reverse proxy recommended for public deployments)
 - **v1.0.0** (2026-01-29): Initial authentication implementation
   - API key authentication for HTTP and WebSocket
   - Role-based authorization (admin, agent, read-only)

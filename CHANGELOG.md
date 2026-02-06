@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Markdown Rendering** (#63) — MarkdownText component for rich text in task descriptions and comments
 - **Cost Prediction** (#54) — Multi-factor cost estimation model (tokens, compute, overhead) for task budgeting
 - **CLI Usage Reporting** (#50) — `vk usage` command for token and cost reporting from the terminal
+- **Dashboard Widget Toggles** (#92) — Show/hide individual dashboard widgets with settings gear and localStorage persistence
 - **Production Binding** (#55) — `VK_HOST` and `VK_PORT` environment variables for flexible deployment
 
 ### Changed
