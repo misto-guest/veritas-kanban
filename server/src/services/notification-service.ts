@@ -1,256 +1,326 @@
 /**
  * Notification Service
  *
- * Handles notification persistence, formatting, and generation.
- * Extracted from notifications.ts route to separate business logic from HTTP concerns.
+ * Handles @mention parsing, notification storage, delivery tracking,
+ * and thread subscriptions for multi-agent communication.
  */
 
-import fs from 'fs/promises';
-import path from 'path';
-import type { Task } from '@veritas-kanban/shared';
-import { withFileLock } from './file-lock.js';
+import { createLogger } from '../lib/logger.js';
+import { getStorageBase } from '../storage/fs-helpers.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+
+const log = createLogger('notifications');
+
+// ─── Types ───────────────────────────────────────────────────────
 
 export interface Notification {
   id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  taskId?: string;
-  taskTitle?: string;
-  project?: string;
-  timestamp: string;
-  sent: boolean;
+  /** Task where the mention occurred */
+  taskId: string;
+  /** Agent or user being notified */
+  targetAgent: string;
+  /** Who created the mention */
+  fromAgent: string;
+  /** The comment/content containing the mention */
+  content: string;
+  /** Type of notification */
+  type: 'mention' | 'assignment' | 'status_change' | 'reply';
+  /** Has the notification been delivered/read? */
+  delivered: boolean;
+  /** ISO timestamp when delivered */
+  deliveredAt?: string;
+  /** ISO timestamp of creation */
+  createdAt: string;
 }
 
-export type NotificationType =
-  | 'agent_complete'
-  | 'agent_failed'
-  | 'needs_review'
-  | 'task_done'
-  | 'high_priority'
-  | 'error'
-  | 'milestone'
-  | 'info';
-
-export interface CreateNotificationInput {
-  type: NotificationType;
-  title: string;
-  message: string;
-  taskId?: string;
-  taskTitle?: string;
-  project?: string;
+export interface ThreadSubscription {
+  taskId: string;
+  agent: string;
+  /** How the agent got subscribed */
+  reason: 'mentioned' | 'commented' | 'assigned' | 'manual';
+  subscribedAt: string;
 }
 
-export interface FormattedMessage {
-  id: string;
-  type: NotificationType;
-  text: string;
-  timestamp: string;
+export interface NotificationStats {
+  totalNotifications: number;
+  undelivered: number;
+  byAgent: Record<string, { total: number; undelivered: number }>;
+  byType: Record<string, number>;
 }
 
-// Type icons for message formatting
-const TYPE_ICONS: Record<NotificationType, string> = {
-  agent_complete: '✅',
-  agent_failed: '❌',
-  needs_review: '👀',
-  task_done: '🎉',
-  high_priority: '🔴',
-  error: '⚠️',
-  milestone: '🏆',
-  info: 'ℹ️',
-};
+// ─── Mention Parser ──────────────────────────────────────────────
 
-// Default paths
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DEFAULT_NOTIFICATIONS_FILE = path.join(PROJECT_ROOT, '.veritas-kanban', 'notifications.json');
+/** Extract @mentions from text. Supports @agent-name and @all */
+export function parseMentions(text: string): string[] {
+  const mentionRegex = /@([a-zA-Z0-9_-]+)/g;
+  const mentions: string[] = [];
+  let match: RegExpExecArray | null;
 
-export class NotificationService {
-  private notificationsFile: string;
-  private maxNotifications: number;
-
-  constructor(options: { notificationsFile?: string; maxNotifications?: number } = {}) {
-    this.notificationsFile = options.notificationsFile || DEFAULT_NOTIFICATIONS_FILE;
-    this.maxNotifications = options.maxNotifications || 100;
+  while ((match = mentionRegex.exec(text)) !== null) {
+    mentions.push(match[1].toLowerCase());
   }
 
-  // ============ Persistence ============
+  return [...new Set(mentions)];
+}
 
-  async loadNotifications(): Promise<Notification[]> {
+// ─── Service ─────────────────────────────────────────────────────
+
+class NotificationService {
+  private notifications: Notification[] = [];
+  private subscriptions: ThreadSubscription[] = [];
+  private loaded = false;
+
+  private get notificationsPath(): string {
+    return path.join(getStorageBase(), 'notifications.json');
+  }
+
+  private get subscriptionsPath(): string {
+    return path.join(getStorageBase(), 'thread-subscriptions.json');
+  }
+
+  private async ensureLoaded(): Promise<void> {
+    if (this.loaded) return;
     try {
-      const data = await fs.readFile(this.notificationsFile, 'utf-8');
-      return JSON.parse(data);
+      const nData = await fs.readFile(this.notificationsPath, 'utf-8');
+      this.notifications = JSON.parse(nData);
     } catch {
-      // Intentionally silent: file may not exist yet — return empty list
-      return [];
+      this.notifications = [];
     }
-  }
-
-  async saveNotifications(notifications: Notification[]): Promise<void> {
-    await fs.mkdir(path.dirname(this.notificationsFile), { recursive: true });
-    await fs.writeFile(this.notificationsFile, JSON.stringify(notifications, null, 2));
-  }
-
-  async clearNotifications(): Promise<void> {
-    await this.saveNotifications([]);
-  }
-
-  // ============ CRUD Operations ============
-
-  async createNotification(input: CreateNotificationInput): Promise<Notification> {
-    const notification: Notification = {
-      ...input,
-      id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      timestamp: new Date().toISOString(),
-      sent: false,
-    };
-
-    await withFileLock(this.notificationsFile, async () => {
-      const notifications = await this.loadNotifications();
-
-      notifications.push(notification);
-
-      // Keep only last N notifications
-      if (notifications.length > this.maxNotifications) {
-        notifications.splice(0, notifications.length - this.maxNotifications);
-      }
-
-      await this.saveNotifications(notifications);
-    });
-
-    return notification;
-  }
-
-  async getNotifications(filter?: { unsent?: boolean }): Promise<Notification[]> {
-    let notifications = await this.loadNotifications();
-
-    if (filter?.unsent) {
-      notifications = notifications.filter((n) => !n.sent);
+    try {
+      const sData = await fs.readFile(this.subscriptionsPath, 'utf-8');
+      this.subscriptions = JSON.parse(sData);
+    } catch {
+      this.subscriptions = [];
     }
-
-    // Most recent first
-    return notifications.reverse();
+    this.loaded = true;
   }
 
-  async markAsSent(ids: string[]): Promise<number> {
-    const notifications = await this.loadNotifications();
-
-    let marked = 0;
-    notifications.forEach((n) => {
-      if (ids.includes(n.id)) {
-        n.sent = true;
-        marked++;
-      }
-    });
-
-    await this.saveNotifications(notifications);
-    return marked;
+  private async saveNotifications(): Promise<void> {
+    await fs.writeFile(this.notificationsPath, JSON.stringify(this.notifications, null, 2));
   }
 
-  // ============ Formatting Logic ============
-
-  /**
-   * Format a notification for Teams delivery
-   */
-  formatForTeams(notification: Notification): FormattedMessage {
-    const icon = TYPE_ICONS[notification.type];
-    let text = `${icon} **${notification.title}**\n${notification.message}`;
-
-    if (notification.taskTitle) {
-      text += `\n\n📋 Task: ${notification.taskTitle}`;
-      if (notification.project) text += ` (#${notification.project})`;
-      text += `\n🔗 \`vk show ${notification.taskId?.slice(-8)}\``;
-    }
-
-    return {
-      id: notification.id,
-      type: notification.type,
-      text,
-      timestamp: notification.timestamp,
-    };
+  private async saveSubscriptions(): Promise<void> {
+    await fs.writeFile(this.subscriptionsPath, JSON.stringify(this.subscriptions, null, 2));
   }
 
   /**
-   * Get unsent notifications formatted for Teams
+   * Process a comment for @mentions and create notifications.
+   * Also subscribes the commenter to the thread.
    */
-  async getPendingForTeams(): Promise<{ count: number; messages: FormattedMessage[] }> {
-    const notifications = await this.loadNotifications();
-    const unsent = notifications.filter((n) => !n.sent);
+  async processComment(params: {
+    taskId: string;
+    fromAgent: string;
+    content: string;
+    allAgents?: string[];
+  }): Promise<Notification[]> {
+    await this.ensureLoaded();
 
-    if (unsent.length === 0) {
-      return { count: 0, messages: [] };
-    }
-
-    const messages = unsent.map((n) => this.formatForTeams(n));
-    return { count: unsent.length, messages };
-  }
-
-  // ============ Notification Generation ============
-
-  /**
-   * Check tasks and generate notifications for conditions that need attention.
-   * Returns newly created notifications.
-   */
-  async checkTasksForNotifications(tasks: Task[]): Promise<Notification[]> {
+    const mentions = parseMentions(params.content);
     const created: Notification[] = [];
-    const existing = await this.loadNotifications();
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
 
-    // Check for blocked tasks where agent completed work (needs human review)
-    const inReview = tasks.filter(
-      (t) =>
-        t.status === 'blocked' && t.attempt?.status === 'complete' && t.attempt?.agent !== 'veritas'
+    // Expand @all to all known agents
+    let targets = mentions.filter((m) => m !== 'all');
+    if (mentions.includes('all') && params.allAgents) {
+      targets = [...new Set([...targets, ...params.allAgents])];
+    }
+
+    // Remove self-mentions
+    targets = targets.filter((t) => t !== params.fromAgent.toLowerCase());
+
+    // Also notify thread subscribers (if not already in mentions)
+    const subscribers = this.subscriptions
+      .filter((s) => s.taskId === params.taskId)
+      .map((s) => s.agent.toLowerCase());
+
+    const allTargets = [...new Set([...targets, ...subscribers])].filter(
+      (t) => t !== params.fromAgent.toLowerCase()
     );
 
-    for (const task of inReview) {
-      const alreadyNotified = existing.some(
-        (n) =>
-          n.taskId === task.id &&
-          n.type === 'needs_review' &&
-          new Date(n.timestamp).getTime() > oneDayAgo
-      );
-
-      if (!alreadyNotified) {
-        const notification = await this.createNotification({
-          type: 'needs_review',
-          title: 'Code Ready for Review',
-          message: `Agent completed work on "${task.title}". Please review the changes.`,
-          taskId: task.id,
-          taskTitle: task.title,
-          project: task.project,
-        });
-        created.push(notification);
-      }
+    for (const target of allTargets) {
+      const notification: Notification = {
+        id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        taskId: params.taskId,
+        targetAgent: target,
+        fromAgent: params.fromAgent,
+        content: params.content.slice(0, 500),
+        type: targets.includes(target) ? 'mention' : 'reply',
+        delivered: false,
+        createdAt: new Date().toISOString(),
+      };
+      this.notifications.push(notification);
+      created.push(notification);
     }
 
-    // Check for failed agent attempts
-    const failed = tasks.filter((t) => t.attempt?.status === 'failed' && t.status !== 'done');
+    // Subscribe the commenter
+    await this.subscribe(params.taskId, params.fromAgent, 'commented');
 
-    for (const task of failed) {
-      const alreadyNotified = existing.some(
-        (n) =>
-          n.taskId === task.id &&
-          n.type === 'agent_failed' &&
-          new Date(n.timestamp).getTime() > oneDayAgo
-      );
-
-      if (!alreadyNotified) {
-        const notification = await this.createNotification({
-          type: 'agent_failed',
-          title: 'Agent Failed',
-          message: `${task.attempt?.agent} failed on "${task.title}". May need manual intervention.`,
-          taskId: task.id,
-          taskTitle: task.title,
-          project: task.project,
-        });
-        created.push(notification);
-      }
+    // Subscribe mentioned agents
+    for (const target of targets) {
+      await this.subscribe(params.taskId, target, 'mentioned');
     }
+
+    await this.saveNotifications();
+
+    log.info(
+      { taskId: params.taskId, from: params.fromAgent, mentions: targets.length, subscribers: allTargets.length - targets.length },
+      'Processed comment mentions'
+    );
 
     return created;
   }
+
+  /**
+   * Create a notification for task assignment.
+   */
+  async notifyAssignment(taskId: string, agents: string[], assignedBy: string): Promise<void> {
+    await this.ensureLoaded();
+
+    for (const agent of agents) {
+      if (agent.toLowerCase() === assignedBy.toLowerCase()) continue;
+
+      const notification: Notification = {
+        id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        taskId,
+        targetAgent: agent.toLowerCase(),
+        fromAgent: assignedBy,
+        content: `You were assigned to this task by ${assignedBy}`,
+        type: 'assignment',
+        delivered: false,
+        createdAt: new Date().toISOString(),
+      };
+      this.notifications.push(notification);
+
+      // Auto-subscribe assigned agents
+      await this.subscribe(taskId, agent, 'assigned');
+    }
+
+    await this.saveNotifications();
+  }
+
+  /**
+   * Get notifications for an agent.
+   */
+  async getNotifications(filters: {
+    agent: string;
+    undelivered?: boolean;
+    taskId?: string;
+    limit?: number;
+  }): Promise<Notification[]> {
+    await this.ensureLoaded();
+
+    let results = this.notifications.filter(
+      (n) => n.targetAgent === filters.agent.toLowerCase()
+    );
+
+    if (filters.undelivered) {
+      results = results.filter((n) => !n.delivered);
+    }
+    if (filters.taskId) {
+      results = results.filter((n) => n.taskId === filters.taskId);
+    }
+
+    results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    if (filters.limit) {
+      results = results.slice(0, filters.limit);
+    }
+
+    return results;
+  }
+
+  /**
+   * Mark a notification as delivered.
+   */
+  async markDelivered(notificationId: string): Promise<boolean> {
+    await this.ensureLoaded();
+
+    const notification = this.notifications.find((n) => n.id === notificationId);
+    if (!notification) return false;
+
+    notification.delivered = true;
+    notification.deliveredAt = new Date().toISOString();
+    await this.saveNotifications();
+    return true;
+  }
+
+  /**
+   * Mark all notifications for an agent as delivered.
+   */
+  async markAllDelivered(agent: string): Promise<number> {
+    await this.ensureLoaded();
+
+    let count = 0;
+    const now = new Date().toISOString();
+    for (const n of this.notifications) {
+      if (n.targetAgent === agent.toLowerCase() && !n.delivered) {
+        n.delivered = true;
+        n.deliveredAt = now;
+        count++;
+      }
+    }
+
+    if (count > 0) await this.saveNotifications();
+    return count;
+  }
+
+  /**
+   * Get notification statistics.
+   */
+  async getStats(): Promise<NotificationStats> {
+    await this.ensureLoaded();
+
+    const byAgent: Record<string, { total: number; undelivered: number }> = {};
+    const byType: Record<string, number> = {};
+
+    for (const n of this.notifications) {
+      if (!byAgent[n.targetAgent]) {
+        byAgent[n.targetAgent] = { total: 0, undelivered: 0 };
+      }
+      byAgent[n.targetAgent].total++;
+      if (!n.delivered) byAgent[n.targetAgent].undelivered++;
+
+      byType[n.type] = (byType[n.type] || 0) + 1;
+    }
+
+    return {
+      totalNotifications: this.notifications.length,
+      undelivered: this.notifications.filter((n) => !n.delivered).length,
+      byAgent,
+      byType,
+    };
+  }
+
+  /**
+   * Subscribe an agent to a task thread.
+   */
+  async subscribe(taskId: string, agent: string, reason: ThreadSubscription['reason']): Promise<void> {
+    await this.ensureLoaded();
+
+    const exists = this.subscriptions.some(
+      (s) => s.taskId === taskId && s.agent === agent.toLowerCase()
+    );
+    if (exists) return;
+
+    this.subscriptions.push({
+      taskId,
+      agent: agent.toLowerCase(),
+      reason,
+      subscribedAt: new Date().toISOString(),
+    });
+    await this.saveSubscriptions();
+  }
+
+  /**
+   * Get subscriptions for a task.
+   */
+  async getSubscriptions(taskId: string): Promise<ThreadSubscription[]> {
+    await this.ensureLoaded();
+    return this.subscriptions.filter((s) => s.taskId === taskId);
+  }
 }
 
-// Singleton instance
+// Singleton
 let instance: NotificationService | null = null;
 
 export function getNotificationService(): NotificationService {
