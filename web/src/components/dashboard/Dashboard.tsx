@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { 
-  useMetrics, 
+import {
+  useMetrics,
   useTaskCost,
   useUtilization,
-  formatTokens, 
+  formatTokens,
   formatDuration,
   type MetricsPeriod,
   type TrendDirection,
@@ -11,14 +11,11 @@ import {
 import { useTasks } from '@/hooks/useTasks';
 import { useProjects } from '@/hooks/useProjects';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  RefreshCw,
-} from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
 import { ExportDialog } from './ExportDialog';
 import { DashboardFilterBar } from './DashboardFilterBar';
+import { useFeatureSettings } from '@/hooks/useFeatureSettings';
+import type { DashboardWidgetSettings } from '@veritas-kanban/shared';
 import { cn } from '@/lib/utils';
 import { DrillDownPanel, type DrillDownType } from './DrillDownPanel';
 import { TasksDrillDown } from './TasksDrillDown';
@@ -37,13 +34,7 @@ import { SessionMetrics } from './SessionMetrics';
 // Trend indicator component
 // direction: 'up' always means improvement, 'down' means decline (from backend)
 // change: the actual percentage change in the value (can be negative)
-function TrendIndicator({ 
-  direction, 
-  change, 
-}: { 
-  direction: TrendDirection; 
-  change: number;
-}) {
+function TrendIndicator({ direction, change }: { direction: TrendDirection; change: number }) {
   if (direction === 'flat') {
     return (
       <span className="inline-flex items-center text-muted-foreground text-xs">
@@ -52,15 +43,15 @@ function TrendIndicator({
       </span>
     );
   }
-  
+
   // direction='up' means improvement, which is always green
   const isGood = direction === 'up';
   const colorClass = isGood ? 'text-green-500' : 'text-red-500';
-  
+
   // Arrow direction based on actual value change
   const valueWentUp = change > 0;
   const Icon = valueWentUp ? TrendingUp : TrendingDown;
-  
+
   return (
     <span className={cn('inline-flex items-center text-xs', colorClass)}>
       <Icon className="h-3 w-3 mr-0.5" />
@@ -79,7 +70,7 @@ interface StatCardProps {
 
 function StatCard({ title, children, onClick, clickable }: StatCardProps) {
   return (
-    <div 
+    <div
       className={cn(
         'rounded-lg border bg-card p-4',
         clickable && 'cursor-pointer hover:ring-2 hover:ring-ring transition-all'
@@ -87,17 +78,19 @@ function StatCard({ title, children, onClick, clickable }: StatCardProps) {
       onClick={onClick}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
-      onKeyDown={clickable ? (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick?.();
-        }
-      } : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
     >
       <h4 className="text-sm font-medium text-muted-foreground mb-3">{title}</h4>
-      <div className="space-y-2">
-        {children}
-      </div>
+      <div className="space-y-2">{children}</div>
     </div>
   );
 }
@@ -114,12 +107,8 @@ function StatRow({ label, value, subLabel, highlight }: StatRowProps) {
     <div className="flex justify-between items-baseline">
       <span className="text-sm text-muted-foreground">{label}</span>
       <div className="text-right">
-        <span className={cn('font-semibold', highlight && 'text-primary')}>
-          {value}
-        </span>
-        {subLabel && (
-          <span className="text-xs text-muted-foreground ml-1">({subLabel})</span>
-        )}
+        <span className={cn('font-semibold', highlight && 'text-primary')}>{value}</span>
+        {subLabel && <span className="text-xs text-muted-foreground ml-1">({subLabel})</span>}
       </div>
     </div>
   );
@@ -132,34 +121,57 @@ export function Dashboard() {
   const [project, setProject] = useState<string | undefined>(undefined);
   const [drillDown, setDrillDown] = useState<DrillDownType>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  
-  const { data: metrics, isLoading, isFetching, error, dataUpdatedAt } = useMetrics(period, project, customFrom, customTo);
+
+  const { settings } = useFeatureSettings();
+  const widgets: DashboardWidgetSettings = settings.board.dashboardWidgets ?? {
+    showTokenUsage: true,
+    showRunDuration: true,
+    showAgentComparison: true,
+    showStatusTimeline: true,
+    showCostPerTask: true,
+    showAgentUtilization: true,
+    showWallTime: true,
+    showSessionMetrics: true,
+    showActivityClock: true,
+    showWhereTimeWent: true,
+    showHourlyActivity: true,
+    showTrendsCharts: true,
+  };
+
+  const {
+    data: metrics,
+    isLoading,
+    isFetching,
+    error,
+    dataUpdatedAt,
+  } = useMetrics(period, project, customFrom, customTo);
   const { data: taskCost } = useTaskCost(period, project, customFrom, customTo);
   const { data: utilization } = useUtilization(period, customFrom, customTo);
   const { data: tasks } = useTasks();
   const { data: projectsList = [] } = useProjects();
-  
+
   // Get unique project IDs from tasks, then map to project configs for labels
-  const projectIds = tasks 
-    ? [...new Set(tasks.filter(t => t.project).map(t => t.project!))]
+  const projectIds = tasks
+    ? [...new Set(tasks.filter((t) => t.project).map((t) => t.project!))]
     : [];
-  const projects = projectsList.filter(p => projectIds.includes(p.id));
+  const projects = projectsList.filter((p) => projectIds.includes(p.id));
 
   if (error) {
-    return (
-      <div className="p-4 text-center text-destructive">
-        Failed to load metrics
-      </div>
-    );
+    return <div className="p-4 text-center text-destructive">Failed to load metrics</div>;
   }
 
   const getDrillDownTitle = () => {
     switch (drillDown) {
-      case 'tasks': return 'Task Details';
-      case 'errors': return 'Failed Runs';
-      case 'tokens': return 'Token Usage Breakdown';
-      case 'duration': return 'Run Duration Breakdown';
-      default: return '';
+      case 'tasks':
+        return 'Task Details';
+      case 'errors':
+        return 'Failed Runs';
+      case 'tokens':
+        return 'Token Usage Breakdown';
+      case 'duration':
+        return 'Run Duration Breakdown';
+      default:
+        return '';
     }
   };
 
@@ -191,7 +203,7 @@ export function Dashboard() {
         <RefreshCw className={cn('h-3 w-3', isFetching && 'animate-spin')} />
         {isFetching ? 'Refreshing...' : `Updated ${new Date(dataUpdatedAt).toLocaleTimeString()}`}
       </div>
-      
+
       {/* Export Dialog */}
       <ExportDialog
         open={exportDialogOpen}
@@ -212,86 +224,78 @@ export function Dashboard() {
           metrics.runs.runs === 0 ? (
             <div className="rounded-lg border bg-muted/20 p-8 text-center">
               <p className="text-muted-foreground">No agent runs recorded in this period</p>
-              <p className="text-xs text-muted-foreground mt-1">Runs will appear here once telemetry data is collected</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Runs will appear here once telemetry data is collected
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
               {/* Tokens Card */}
-              <StatCard 
-                title={
-                  <div className="flex items-center justify-between">
-                    <span>Token Usage</span>
-                    <TrendIndicator 
-                      direction={metrics.trends.tokensTrend} 
-                      change={metrics.trends.tokensChange}
-                    />
+              {widgets.showTokenUsage && (
+                <StatCard
+                  title={
+                    <div className="flex items-center justify-between">
+                      <span>Token Usage</span>
+                      <TrendIndicator
+                        direction={metrics.trends.tokensTrend}
+                        change={metrics.trends.tokensChange}
+                      />
+                    </div>
+                  }
+                  onClick={() => setDrillDown('tokens')}
+                  clickable
+                >
+                  <StatRow label="Total" value={formatTokens(metrics.tokens.totalTokens)} />
+                  <StatRow label="Input" value={formatTokens(metrics.tokens.inputTokens)} />
+                  <StatRow label="Output" value={formatTokens(metrics.tokens.outputTokens)} />
+                  {metrics.tokens.cacheTokens > 0 && (
+                    <StatRow label="Cache" value={formatTokens(metrics.tokens.cacheTokens)} />
+                  )}
+                  <div className="pt-2 border-t mt-2">
+                    <div className="text-xs text-muted-foreground mb-1">Per Run</div>
+                    <div className="flex justify-between text-sm">
+                      <span>p50: {formatTokens(metrics.tokens.perSuccessfulRun.p50)}</span>
+                      <span>p95: {formatTokens(metrics.tokens.perSuccessfulRun.p95)}</span>
+                    </div>
                   </div>
-                }
-                onClick={() => setDrillDown('tokens')}
-                clickable
-              >
-                <StatRow 
-                  label="Total" 
-                  value={formatTokens(metrics.tokens.totalTokens)} 
-                />
-                <StatRow 
-                  label="Input" 
-                  value={formatTokens(metrics.tokens.inputTokens)} 
-                />
-                <StatRow 
-                  label="Output" 
-                  value={formatTokens(metrics.tokens.outputTokens)} 
-                />
-                {metrics.tokens.cacheTokens > 0 && (
-                  <StatRow 
-                    label="Cache" 
-                    value={formatTokens(metrics.tokens.cacheTokens)} 
-                  />
-                )}
-                <div className="pt-2 border-t mt-2">
-                  <div className="text-xs text-muted-foreground mb-1">Per Run</div>
-                  <div className="flex justify-between text-sm">
-                    <span>p50: {formatTokens(metrics.tokens.perSuccessfulRun.p50)}</span>
-                    <span>p95: {formatTokens(metrics.tokens.perSuccessfulRun.p95)}</span>
-                  </div>
-                </div>
-              </StatCard>
+                </StatCard>
+              )}
 
               {/* Duration Card */}
-              <StatCard 
-                title={
-                  <div className="flex items-center justify-between">
-                    <span>Run Duration</span>
-                    <TrendIndicator 
-                      direction={metrics.trends.durationTrend} 
-                      change={metrics.trends.durationChange}
-                    />
-                  </div>
-                }
-                onClick={() => setDrillDown('duration')}
-                clickable
-              >
-                <StatRow 
-                  label="Runs" 
-                  value={metrics.duration.runs} 
-                />
-                <StatRow 
-                  label="Average" 
-                  value={formatDuration(metrics.duration.avgMs)} 
-                />
-                <div className="pt-2 border-t mt-2">
-                  <div className="flex justify-between text-sm">
-                    <div>
-                      <span className="text-muted-foreground">p50: </span>
-                      <span className="font-medium">{formatDuration(metrics.duration.p50Ms)}</span>
+              {widgets.showRunDuration && (
+                <StatCard
+                  title={
+                    <div className="flex items-center justify-between">
+                      <span>Run Duration</span>
+                      <TrendIndicator
+                        direction={metrics.trends.durationTrend}
+                        change={metrics.trends.durationChange}
+                      />
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">p95: </span>
-                      <span className="font-medium">{formatDuration(metrics.duration.p95Ms)}</span>
+                  }
+                  onClick={() => setDrillDown('duration')}
+                  clickable
+                >
+                  <StatRow label="Runs" value={metrics.duration.runs} />
+                  <StatRow label="Average" value={formatDuration(metrics.duration.avgMs)} />
+                  <div className="pt-2 border-t mt-2">
+                    <div className="flex justify-between text-sm">
+                      <div>
+                        <span className="text-muted-foreground">p50: </span>
+                        <span className="font-medium">
+                          {formatDuration(metrics.duration.p50Ms)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">p95: </span>
+                        <span className="font-medium">
+                          {formatDuration(metrics.duration.p95Ms)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </StatCard>
+                </StatCard>
+              )}
             </div>
           )
         ) : null}
@@ -300,12 +304,16 @@ export function Dashboard() {
       {/* Budget moved to BoardSidebar */}
 
       {/* Agent Comparison (left) + Agent Activity (right) */}
-      <div className="grid grid-cols-2 gap-4">
-        <AgentComparison project={project} />
-        <div className="rounded-lg border bg-card p-4">
-          <StatusTimeline />
+      {(widgets.showAgentComparison || widgets.showStatusTimeline) && (
+        <div className="grid grid-cols-2 gap-4">
+          {widgets.showAgentComparison && <AgentComparison project={project} />}
+          {widgets.showStatusTimeline && (
+            <div className="rounded-lg border bg-card p-4">
+              <StatusTimeline />
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Cost per Task + Agent Utilization */}
       <div className="grid grid-cols-2 gap-4">
@@ -337,10 +345,10 @@ export function Dashboard() {
                       {t.taskTitle || t.taskId}
                     </span>
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="font-mono font-medium">
-                        ${t.estimatedCost.toFixed(2)}
+                      <span className="font-mono font-medium">${t.estimatedCost.toFixed(2)}</span>
+                      <span className="text-muted-foreground/0 group-hover:text-primary transition-colors text-xs">
+                        →
                       </span>
-                      <span className="text-muted-foreground/0 group-hover:text-primary transition-colors text-xs">→</span>
                     </div>
                   </button>
                 ))}
@@ -358,11 +366,16 @@ export function Dashboard() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground text-sm">Overall</span>
-                <span className={cn(
-                  'font-bold text-lg',
-                  utilization.utilizationPercent > 50 ? 'text-green-500' :
-                  utilization.utilizationPercent > 20 ? 'text-yellow-500' : 'text-muted-foreground'
-                )}>
+                <span
+                  className={cn(
+                    'font-bold text-lg',
+                    utilization.utilizationPercent > 50
+                      ? 'text-green-500'
+                      : utilization.utilizationPercent > 20
+                        ? 'text-yellow-500'
+                        : 'text-muted-foreground'
+                  )}
+                >
                   {utilization.utilizationPercent.toFixed(1)}%
                 </span>
               </div>
@@ -371,10 +384,14 @@ export function Dashboard() {
                 <span className="font-semibold">{formatDuration(utilization.totalActiveMs)}</span>
               </div>
               <div className="border-t pt-2 space-y-1.5 max-h-[200px] overflow-y-auto">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Daily</div>
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                  Daily
+                </div>
                 {utilization.daily.map((d) => (
                   <div key={d.date} className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground w-20 shrink-0 text-xs">{d.date.slice(5)}</span>
+                    <span className="text-muted-foreground w-20 shrink-0 text-xs">
+                      {d.date.slice(5)}
+                    </span>
                     <div className="flex-1 h-4 bg-muted rounded-sm overflow-hidden">
                       <div
                         className="h-full bg-green-500 rounded-sm transition-all"
@@ -418,30 +435,13 @@ export function Dashboard() {
         onClose={() => setDrillDown(null)}
       >
         {drillDown === 'tasks' && (
-          <TasksDrillDown 
-            project={project} 
-            onTaskClick={handleTaskClick}
-          />
+          <TasksDrillDown project={project} onTaskClick={handleTaskClick} />
         )}
         {drillDown === 'errors' && (
-          <ErrorsDrillDown 
-            period={period} 
-            project={project}
-            onTaskClick={handleTaskClick}
-          />
+          <ErrorsDrillDown period={period} project={project} onTaskClick={handleTaskClick} />
         )}
-        {drillDown === 'tokens' && (
-          <TokensDrillDown 
-            period={period} 
-            project={project}
-          />
-        )}
-        {drillDown === 'duration' && (
-          <DurationDrillDown 
-            period={period} 
-            project={project}
-          />
-        )}
+        {drillDown === 'tokens' && <TokensDrillDown period={period} project={project} />}
+        {drillDown === 'duration' && <DurationDrillDown period={period} project={project} />}
       </DrillDownPanel>
     </div>
   );

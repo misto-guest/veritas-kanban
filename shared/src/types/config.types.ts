@@ -130,6 +130,22 @@ export interface AppConfig {
 
 // ============ Feature Settings Types ============
 
+/** Individual dashboard widget visibility */
+export interface DashboardWidgetSettings {
+  showTokenUsage: boolean;
+  showRunDuration: boolean;
+  showAgentComparison: boolean;
+  showStatusTimeline: boolean;
+  showCostPerTask: boolean;
+  showAgentUtilization: boolean;
+  showWallTime: boolean;
+  showSessionMetrics: boolean;
+  showActivityClock: boolean;
+  showWhereTimeWent: boolean;
+  showHourlyActivity: boolean;
+  showTrendsCharts: boolean;
+}
+
 /** Board display settings */
 export interface BoardSettings {
   showDashboard: boolean;
@@ -140,6 +156,7 @@ export interface BoardSettings {
   showSprintBadges: boolean;
   enableDragAndDrop: boolean;
   showDoneMetrics: boolean;
+  dashboardWidgets: DashboardWidgetSettings;
 }
 
 /** Task behavior settings */
@@ -236,6 +253,20 @@ export const DEFAULT_FEATURE_SETTINGS: FeatureSettings = {
     showSprintBadges: true,
     enableDragAndDrop: true,
     showDoneMetrics: true,
+    dashboardWidgets: {
+      showTokenUsage: true,
+      showRunDuration: true,
+      showAgentComparison: true,
+      showStatusTimeline: true,
+      showCostPerTask: true,
+      showAgentUtilization: true,
+      showWallTime: true,
+      showSessionMetrics: true,
+      showActivityClock: true,
+      showWhereTimeWent: true,
+      showHourlyActivity: true,
+      showTrendsCharts: true,
+    },
   },
   tasks: {
     enableTimeTracking: true,

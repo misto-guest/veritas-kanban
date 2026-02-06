@@ -1,6 +1,6 @@
 {
   "name": "@veritas-kanban/mcp",
-  "version": "1.4.1",
+  "version": "2.0.0",
   "description": "MCP server for Veritas Kanban",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@veritas-kanban/shared": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "hono": "^4.11.7",
     "zod": "^3.24.0"
   },

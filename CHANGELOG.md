@@ -5,6 +5,76 @@ All notable changes to Veritas Kanban are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-02-06
+
+### ✨ Highlights
+
+**Veritas Kanban 2.0 is the multi-agent release.** 18 features shipped across agent orchestration, dashboard analytics, lifecycle automation, and developer experience. This release transforms VK from a single-agent task board into a full multi-agent orchestration platform.
+
+### Added
+
+#### Multi-Agent System (#28, #29, #30, #31)
+
+- **Agent Registry** (#52) — Service discovery with heartbeat tracking, capabilities, live status, REST API for register/deregister/heartbeat/stats
+- **Multi-Agent Dashboard Sidebar** (#28) — Real-time agent status cards in board sidebar, expandable details, color-coded status indicators (green=working, purple=sub-agent, gray=idle, red=error)
+- **Multi-Agent Task Assignment** (#29) — Assign multiple agents to a single task, color-coded agent chips in task detail and board cards, shared helper utilities
+- **@Mention Notifications** (#30) — @agent-name parsing in comments, thread subscriptions, delivery tracking, notification bell
+- **Agent Permission Levels** (#31) — Intern / Specialist / Lead tiers with configurable approval workflows and autonomy boundaries
+
+#### Dashboard Analytics (#57, #58, #59, #60, #61)
+
+- **Where Time Went** (#57) — Time breakdown by project via telemetry data with color-coded project bars
+- **Activity Clock** (#58) — 24-hour donut chart showing agent work distribution, sourced from status-history transitions
+- **Hourly Activity Chart** (#59) — Bar chart with per-hour event counts, sourced from status-history
+- **Wall Time Toggle** (#60) — Total Agent Time + Avg Run Duration with explanatory tooltips
+- **Session Metrics** (#61) — Session count, success rate, completed/failed/abandoned tracking
+
+#### Lifecycle & Automation
+
+- **Task Lifecycle Hooks** (#72) — 7 built-in hooks (subtask-gate, assignee-required, blocked-reason, done-checklist, auto-archive, time-tracking, notification), 8 lifecycle events, custom hooks API
+- **Documentation Freshness** (#74) — Steward workflow with freshness headers (`fresh-days`, `owner`, `last-verified`), 3-phase automation plan
+- **Error Learning Workflow** (#91) — Structured failure analysis, similarity search for recurring issues, stats API. Inspired by @nateherk's Klouse dashboard concept.
+
+#### Developer Experience
+
+- **Markdown Rendering** (#63) — MarkdownText component for rich text in task descriptions and comments
+- **Cost Prediction** (#54) — Multi-factor cost estimation model (tokens, compute, overhead) for task budgeting
+- **CLI Usage Reporting** (#50) — `vk usage` command for token and cost reporting from the terminal
+- **Production Binding** (#55) — `VK_HOST` and `VK_PORT` environment variables for flexible deployment
+
+### Changed
+
+- **Timezone-aware metrics** — Server reports its timezone dynamically in all API response `meta`; clients can request metrics in their local timezone via `?tz=<offset>` query parameter
+- **Activity data source** — Activity Clock and Hourly Activity Chart now pull from `status-history` (reliable state transitions) instead of `activity.json`
+- **Cost-per-task clickability** — Enhanced hover states, border effects, and arrow indicator
+- **Archive optimistic updates** — Archive mutations now remove tasks from cache immediately via `onMutate`, with rollback on error
+- **Agent naming convention** — Agent names use ALL CAPS for acronyms (VERITAS, TARS, CASE, K-2SO, R2-D2, MAX)
+
+### Fixed
+
+- **Daily Activity 100% bug** — Utilization was calculated using UTC dates but displayed in local timezone, causing incorrect percentages
+- **Feb 3 telemetry outlier** — 66-minute run normalized to 19min (p95 level)
+- **Feb 2 telemetry outliers** — 3 runs (15-19min range) normalized to 10min
+- **Registry stats interface mismatch** — Frontend expected `totalAgents`/`onlineAgents` but server sent `total`/`online`; interface updated to match server
+
+### Security
+
+- **MCP SDK vulnerability patched** — Updated `@modelcontextprotocol/sdk` from 1.25.3 to ^1.26.0 (GHSA-345p-7cg4-v4c7, cross-client data leak)
+- **Rate limiting documented** — README now warns that VK does not include built-in rate limiting; reverse proxy recommended for public deployments
+
+### Maintenance
+
+- **21 stale feature branches cleaned** — Down to `main` only
+- **README roadmap updated** — Reflects v2.0 shipped features, v1.6.0 and earlier history preserved
+- **Version bumped** across all packages (root, server, web, shared, mcp)
+
+### Credits
+
+- [@nateherk](https://github.com/nateherk) — Error learning workflow inspired by Klouse dashboard concept
+- [@mvoutov](https://github.com/mvoutov) — Documentation freshness inspired by BoardKit Orchestrator
+
+---
+
 ## [1.6.0] - 2026-02-05
 
 ### ✨ Highlights
