@@ -140,6 +140,8 @@ export interface Task {
 
   // Agent assignment — "auto" uses routing engine, or a specific agent slug
   agent?: AgentType | 'auto';
+  // Multi-agent assignment — multiple agents collaborating on a task
+  agents?: AgentType[];
 
   // Code task specific
   git?: TaskGit;
@@ -239,6 +241,7 @@ export interface CreateTaskInput {
   project?: string;
   sprint?: string;
   agent?: AgentType | 'auto'; // Pre-assign an agent (or "auto" for routing engine)
+  agents?: AgentType[]; // Multi-agent assignment
   subtasks?: Subtask[]; // Can be provided when creating from a template
   blockedBy?: string[]; // Can be provided when creating from a blueprint
 }
@@ -252,6 +255,7 @@ export interface UpdateTaskInput {
   project?: string;
   sprint?: string;
   agent?: AgentType | 'auto';
+  agents?: AgentType[];
   git?: Partial<TaskGit>;
   github?: TaskGitHub;
   attempt?: TaskAttempt;
