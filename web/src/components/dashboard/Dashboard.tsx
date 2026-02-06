@@ -316,117 +316,133 @@ export function Dashboard() {
       )}
 
       {/* Cost per Task + Agent Utilization */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Cost per Task */}
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">Cost per Task</h3>
-          {taskCost ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Total Cost</span>
-                <span className="font-bold text-lg">${taskCost.totalCost.toFixed(2)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Avg per Task</span>
-                <span className="font-semibold">${taskCost.avgCostPerTask.toFixed(2)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm pb-2 border-b">
-                <span className="text-muted-foreground">Tasks with Cost</span>
-                <span className="font-semibold">{taskCost.tasks.length}</span>
-              </div>
-              <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
-                {taskCost.tasks.slice(0, 10).map((t) => (
-                  <button
-                    key={t.taskId}
-                    className="group flex items-center justify-between w-full text-left text-sm hover:bg-primary/10 rounded px-2 py-1.5 transition-colors cursor-pointer border border-transparent hover:border-primary/20"
-                    onClick={() => handleTaskClick(t.taskId)}
-                  >
-                    <span className="truncate flex-1 mr-2 text-muted-foreground group-hover:text-foreground transition-colors">
-                      {t.taskTitle || t.taskId}
-                    </span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="font-mono font-medium">${t.estimatedCost.toFixed(2)}</span>
-                      <span className="text-muted-foreground/0 group-hover:text-primary transition-colors text-xs">
-                        →
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <Skeleton className="h-[200px]" />
-          )}
-        </div>
-
-        {/* Agent Utilization */}
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">Agent Utilization</h3>
-          {utilization ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-sm">Overall</span>
-                <span
-                  className={cn(
-                    'font-bold text-lg',
-                    utilization.utilizationPercent > 50
-                      ? 'text-green-500'
-                      : utilization.utilizationPercent > 20
-                        ? 'text-yellow-500'
-                        : 'text-muted-foreground'
-                  )}
-                >
-                  {utilization.utilizationPercent.toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Active Time</span>
-                <span className="font-semibold">{formatDuration(utilization.totalActiveMs)}</span>
-              </div>
-              <div className="border-t pt-2 space-y-1.5 max-h-[200px] overflow-y-auto">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                  Daily
+      {(widgets.showCostPerTask || widgets.showAgentUtilization) && (
+        <div className="grid grid-cols-2 gap-4">
+          {/* Cost per Task */}
+          {widgets.showCostPerTask && (
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Cost per Task</h3>
+              {taskCost ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Total Cost</span>
+                    <span className="font-bold text-lg">${taskCost.totalCost.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Avg per Task</span>
+                    <span className="font-semibold">${taskCost.avgCostPerTask.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm pb-2 border-b">
+                    <span className="text-muted-foreground">Tasks with Cost</span>
+                    <span className="font-semibold">{taskCost.tasks.length}</span>
+                  </div>
+                  <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+                    {taskCost.tasks.slice(0, 10).map((t) => (
+                      <button
+                        key={t.taskId}
+                        className="group flex items-center justify-between w-full text-left text-sm hover:bg-primary/10 rounded px-2 py-1.5 transition-colors cursor-pointer border border-transparent hover:border-primary/20"
+                        onClick={() => handleTaskClick(t.taskId)}
+                      >
+                        <span className="truncate flex-1 mr-2 text-muted-foreground group-hover:text-foreground transition-colors">
+                          {t.taskTitle || t.taskId}
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="font-mono font-medium">
+                            ${t.estimatedCost.toFixed(2)}
+                          </span>
+                          <span className="text-muted-foreground/0 group-hover:text-primary transition-colors text-xs">
+                            →
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                {utilization.daily.map((d) => (
-                  <div key={d.date} className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground w-20 shrink-0 text-xs">
-                      {d.date.slice(5)}
-                    </span>
-                    <div className="flex-1 h-4 bg-muted rounded-sm overflow-hidden">
-                      <div
-                        className="h-full bg-green-500 rounded-sm transition-all"
-                        style={{ width: `${Math.min(100, d.utilizationPercent)}%` }}
-                      />
-                    </div>
-                    <span className="font-mono text-xs w-12 text-right shrink-0">
-                      {d.utilizationPercent.toFixed(1)}%
+              ) : (
+                <Skeleton className="h-[200px]" />
+              )}
+            </div>
+          )}
+
+          {/* Agent Utilization */}
+          {widgets.showAgentUtilization && (
+            <div className="rounded-lg border bg-card p-4">
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Agent Utilization</h3>
+              {utilization ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground text-sm">Overall</span>
+                    <span
+                      className={cn(
+                        'font-bold text-lg',
+                        utilization.utilizationPercent > 50
+                          ? 'text-green-500'
+                          : utilization.utilizationPercent > 20
+                            ? 'text-yellow-500'
+                            : 'text-muted-foreground'
+                      )}
+                    >
+                      {utilization.utilizationPercent.toFixed(1)}%
                     </span>
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Active Time</span>
+                    <span className="font-semibold">
+                      {formatDuration(utilization.totalActiveMs)}
+                    </span>
+                  </div>
+                  <div className="border-t pt-2 space-y-1.5 max-h-[200px] overflow-y-auto">
+                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                      Daily
+                    </div>
+                    {utilization.daily.map((d) => (
+                      <div key={d.date} className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground w-20 shrink-0 text-xs">
+                          {d.date.slice(5)}
+                        </span>
+                        <div className="flex-1 h-4 bg-muted rounded-sm overflow-hidden">
+                          <div
+                            className="h-full bg-green-500 rounded-sm transition-all"
+                            style={{ width: `${Math.min(100, d.utilizationPercent)}%` }}
+                          />
+                        </div>
+                        <span className="font-mono text-xs w-12 text-right shrink-0">
+                          {d.utilizationPercent.toFixed(1)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <Skeleton className="h-[200px]" />
+              )}
             </div>
-          ) : (
-            <Skeleton className="h-[200px]" />
           )}
         </div>
-      </div>
+      )}
 
       {/* New Dashboard Widgets */}
-      <div className="grid grid-cols-3 gap-4">
-        <WallTimeToggle period={period} />
-        <SessionMetrics period={period} />
-        <ActivityClock period={period} />
-      </div>
+      {(widgets.showWallTime || widgets.showSessionMetrics || widgets.showActivityClock) && (
+        <div className="grid grid-cols-3 gap-4">
+          {widgets.showWallTime && <WallTimeToggle period={period} />}
+          {widgets.showSessionMetrics && <SessionMetrics period={period} />}
+          {widgets.showActivityClock && <ActivityClock period={period} />}
+        </div>
+      )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <WhereTimeWent period={period} />
-        <HourlyActivityChart period={period} />
-      </div>
+      {(widgets.showWhereTimeWent || widgets.showHourlyActivity) && (
+        <div className="grid grid-cols-2 gap-4">
+          {widgets.showWhereTimeWent && <WhereTimeWent period={period} />}
+          {widgets.showHourlyActivity && <HourlyActivityChart period={period} />}
+        </div>
+      )}
 
       {/* Historical Trends Charts (full width) */}
-      <div className="col-span-full">
-        <TrendsCharts project={project} />
-      </div>
+      {widgets.showTrendsCharts && (
+        <div className="col-span-full">
+          <TrendsCharts project={project} />
+        </div>
+      )}
 
       {/* Drill-Down Panel */}
       <DrillDownPanel

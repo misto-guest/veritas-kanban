@@ -12,6 +12,24 @@ function hasDangerousKeys(obj: unknown): boolean {
   return false;
 }
 
+const DashboardWidgetSettingsSchema = z
+  .object({
+    showTokenUsage: z.boolean().optional(),
+    showRunDuration: z.boolean().optional(),
+    showAgentComparison: z.boolean().optional(),
+    showStatusTimeline: z.boolean().optional(),
+    showCostPerTask: z.boolean().optional(),
+    showAgentUtilization: z.boolean().optional(),
+    showWallTime: z.boolean().optional(),
+    showSessionMetrics: z.boolean().optional(),
+    showActivityClock: z.boolean().optional(),
+    showWhereTimeWent: z.boolean().optional(),
+    showHourlyActivity: z.boolean().optional(),
+    showTrendsCharts: z.boolean().optional(),
+  })
+  .strict()
+  .optional();
+
 const BoardSettingsSchema = z
   .object({
     showDashboard: z.boolean().optional(),
@@ -21,6 +39,8 @@ const BoardSettingsSchema = z
     showProjectBadges: z.boolean().optional(),
     showSprintBadges: z.boolean().optional(),
     enableDragAndDrop: z.boolean().optional(),
+    showDoneMetrics: z.boolean().optional(),
+    dashboardWidgets: DashboardWidgetSettingsSchema,
   })
   .strict()
   .optional();

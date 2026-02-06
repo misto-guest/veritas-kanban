@@ -5,11 +5,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  useFeatureSettings,
-  useDebouncedFeatureUpdate,
-} from '@/hooks/useFeatureSettings';
-import { DEFAULT_FEATURE_SETTINGS } from '@veritas-kanban/shared';
+import { useFeatureSettings, useDebouncedFeatureUpdate } from '@/hooks/useFeatureSettings';
+import { DEFAULT_FEATURE_SETTINGS, type DashboardWidgetSettings } from '@veritas-kanban/shared';
 import { SettingRow, ToggleRow, SectionHeader, SaveIndicator } from '../shared';
 
 export function BoardTab() {
@@ -37,6 +34,54 @@ export function BoardTab() {
           checked={settings.board.showDashboard}
           onCheckedChange={(v) => update('showDashboard', v)}
         />
+        {settings.board.showDashboard && (
+          <>
+            <div className="pl-6 border-l-2 border-muted ml-2 space-y-0 divide-y">
+              {(
+                [
+                  ['showTokenUsage', 'Token Usage', 'Token consumption per run'],
+                  ['showRunDuration', 'Run Duration', 'Average run duration and percentiles'],
+                  ['showAgentComparison', 'Agent Comparison', 'Side-by-side agent performance'],
+                  ['showStatusTimeline', 'Status Timeline', 'Agent activity timeline'],
+                  ['showCostPerTask', 'Cost per Task', 'Dollar cost breakdown by task'],
+                  ['showAgentUtilization', 'Agent Utilization', 'Active vs idle time'],
+                  ['showWallTime', 'Wall Time', 'Wall clock time metrics'],
+                  ['showSessionMetrics', 'Session Metrics', 'Session count and duration'],
+                  ['showActivityClock', 'Activity Clock', '24-hour activity heatmap'],
+                  ['showWhereTimeWent', 'Where Time Went', 'Time distribution by project'],
+                  ['showHourlyActivity', 'Hourly Activity', 'Activity by hour of day'],
+                  [
+                    'showTrendsCharts',
+                    'Trends Charts',
+                    'Success rate, tokens, and duration over time',
+                  ],
+                ] as const
+              ).map(([key, label, desc]) => (
+                <ToggleRow
+                  key={key}
+                  label={label}
+                  description={desc}
+                  checked={
+                    (settings.board.dashboardWidgets ??
+                      DEFAULT_FEATURE_SETTINGS.board.dashboardWidgets)?.[
+                      key as keyof DashboardWidgetSettings
+                    ] ?? true
+                  }
+                  onCheckedChange={(v) =>
+                    debouncedUpdate({
+                      board: {
+                        dashboardWidgets: {
+                          ...settings.board.dashboardWidgets,
+                          [key]: v,
+                        },
+                      },
+                    })
+                  }
+                />
+              ))}
+            </div>
+          </>
+        )}
         <ToggleRow
           label="Archive Suggestions"
           description="Show banner when all sprint tasks are complete"
