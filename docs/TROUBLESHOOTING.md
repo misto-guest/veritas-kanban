@@ -188,6 +188,20 @@ VERITAS_API_KEYS=my-agent:my-secret-key:agent
 
 ### Three ways to authenticate
 
+### Rate limit errors behind reverse proxy
+
+**Symptom:** `ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false`
+
+**Cause:** Running behind a reverse proxy (nginx, Caddy, Traefik, Synology DSM) without configuring trust proxy.
+
+**Fix:** Set the `TRUST_PROXY` environment variable:
+
+```env
+TRUST_PROXY=1  # Trust one proxy hop (most common)
+```
+
+See [Deployment Guide](DEPLOYMENT.md#reverse-proxy-nginx) for full configuration options.
+
 ```bash
 # 1. Authorization header (Bearer token)
 curl -H "Authorization: Bearer your-api-key" http://localhost:3001/api/tasks

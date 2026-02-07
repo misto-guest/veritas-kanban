@@ -21,6 +21,8 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - DATA_DIR=/app/data
+      # Reverse proxy support: set when running behind nginx, Caddy, Traefik, etc.
+      # - TRUST_PROXY=1
       # Auth: set API keys for production use
       # - API_KEYS=key1:admin,key2:viewer
       # - JWT_SECRET=your-secret-here

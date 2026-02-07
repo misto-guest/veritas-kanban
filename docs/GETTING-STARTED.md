@@ -72,6 +72,7 @@ b. Edit the new file:
 - `VERITAS_ADMIN_KEY` → 32+ chars (use `node -e "console.log(crypto.randomBytes(32).toString('hex'))"`)
 - `VERITAS_AUTH_ENABLED=true` (default)
 - `VERITAS_AUTH_LOCALHOST_BYPASS=true` to avoid auth friction locally
+- Optional: set `TRUST_PROXY` when running behind a reverse proxy (nginx, Caddy, Traefik, Synology DSM). For example, `TRUST_PROXY=1` to trust a single proxy hop. See the Deployment Guide for details.
 - Optional: set `HOST=127.0.0.1` (avoids proxy ambiguity)
 
 ### 3. Start the dev stack

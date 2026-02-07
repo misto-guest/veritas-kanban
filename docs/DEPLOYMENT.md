@@ -174,6 +174,18 @@ The server:
 
 ### Reverse Proxy (nginx)
 
+When running behind nginx (or any reverse proxy), set the `TRUST_PROXY` environment
+variable so Express can correctly detect the real client IP from `X-Forwarded-*`
+headers. This is required for accurate rate limiting and security logging.
+
+Common values:
+
+- `TRUST_PROXY=1` — trust a single proxy hop (most common when nginx is directly in front)
+- ~~`TRUST_PROXY=true`~~ — **blocked by default** (trusts all proxies, dangerous on public internet). Use a hop count or subnet instead
+- `TRUST_PROXY=loopback` — only trust loopback addresses (`127.0.0.1`, `::1`)
+
+See the Express docs for full options: https://expressjs.com/en/guide/behind-proxies.html
+
 Place behind nginx for TLS termination and HTTP/2:
 
 ```nginx
@@ -237,6 +249,16 @@ CORS_ORIGINS=https://kanban.example.com
 ```
 
 ### Reverse Proxy (Caddy)
+
+When using Caddy as a reverse proxy, also set `TRUST_PROXY` so Express trusts the
+Caddy hop and uses the correct client IP for rate limiting and logging.
+
+Examples:
+
+```env
+TRUST_PROXY=1       # Caddy directly in front of Veritas Kanban
+TRUST_PROXY=2       # If an additional CDN sits in front of Caddy
+```
 
 Caddy handles TLS automatically:
 

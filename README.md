@@ -10,7 +10,7 @@ Built for developers who want a visual Kanban board that works with autonomous c
 
 [![CI](https://github.com/BradGroux/veritas-kanban/actions/workflows/ci.yml/badge.svg)](https://github.com/BradGroux/veritas-kanban/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.1.1-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -120,6 +120,7 @@ Open [http://localhost:3000](http://localhost:3000) — that's it. The board aut
 
 ### 🤖 AI Agents (v2.0)
 
+- **Reverse Proxy Ready** — Deploy behind nginx, Caddy, Traefik, or any reverse proxy with the `TRUST_PROXY` environment variable (v2.1.1)
 - **Squad Chat** — Real-time agent-to-agent communication with WebSocket updates, system lifecycle events (spawned/completed/failed), model attribution per message, and configurable display names (NEW — v2.0)
 - **Broadcast Notifications** — Priority-based persistent notifications with read receipts and agent-specific delivery (NEW — v2.0)
 - **Task Deliverables** — First-class deliverable objects with type/status tracking (code, documentation, data, etc.) (NEW — v2.0)

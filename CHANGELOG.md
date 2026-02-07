@@ -5,6 +5,20 @@ All notable changes to Veritas Kanban are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-02-07
+
+### Fixed
+
+- **Reverse Proxy Support** (#100) — Added `TRUST_PROXY` environment variable for deployments behind nginx, Caddy, Traefik, Synology DSM, and other reverse proxies. Fixes `express-rate-limit` ValidationError and WebSocket authentication loops caused by untrusted `X-Forwarded-For` headers.
+  - Supports hop counts (`TRUST_PROXY=1`), named values (`loopback`, `linklocal`), and subnet strings
+  - `TRUST_PROXY=true` is blocked by default (security hardening — logs warning, falls back to no trust)
+  - Disabled by default — no behavior change for existing deployments
+  - Documentation added for nginx, Caddy, and Docker Compose configurations
+
+### Security
+
+- Blocked `TRUST_PROXY=true` to prevent accidental trust-all-proxies misconfiguration on public-facing deployments
+
 ## [2.0.0] - 2026-02-06
 
 ### ✨ Highlights
