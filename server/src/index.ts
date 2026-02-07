@@ -98,6 +98,41 @@ process.on('uncaughtException', (err: Error) => {
 });
 
 const app = express();
+
+// ── Reverse-proxy trust ─────────────────────────────────────────────
+// When deployed behind a reverse proxy (nginx, Caddy, Traefik, Synology DSM),
+// set TRUST_PROXY to enable correct client IP detection for rate limiting
+// and X-Forwarded-* header handling.  Disabled by default (Express default).
+//
+// Accepted values:
+//   TRUST_PROXY=1              → trust one proxy hop (recommended)
+//   TRUST_PROXY=2              → trust two hops (CDN + reverse proxy)
+//   TRUST_PROXY=loopback       → trust loopback addresses only
+//   TRUST_PROXY=linklocal      → trust link-local addresses
+//   TRUST_PROXY=uniquelocal    → trust unique-local addresses
+//   TRUST_PROXY=10.0.0.0/8     → trust a specific subnet
+//
+// ⚠️  TRUST_PROXY=true is intentionally rejected — it trusts ALL proxies
+//     and is dangerous on public-facing deployments.
+//
+// See: https://expressjs.com/en/guide/behind-proxies.html
+const trustProxy = process.env.TRUST_PROXY;
+if (trustProxy !== undefined && trustProxy !== '') {
+  // Block dangerous wildcard trust
+  if (trustProxy === 'true') {
+    log.warn(
+      'TRUST_PROXY=true is not allowed (trusts all proxies, unsafe for production). ' +
+        'Use a numeric hop count (e.g. TRUST_PROXY=1) or a specific subnet instead. ' +
+        'Falling back to default (no trust).'
+    );
+  } else {
+    const parsed = Number(trustProxy);
+    const value = trustProxy === 'false' ? false : isNaN(parsed) ? trustProxy : parsed;
+    app.set('trust proxy', value);
+    log.info(`Trust proxy configured: ${JSON.stringify(value)}`);
+  }
+}
+
 const PORT = process.env.PORT || 3001;
 
 // ============================================
