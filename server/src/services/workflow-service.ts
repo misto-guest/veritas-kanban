@@ -14,6 +14,13 @@ import { createLogger } from '../lib/logger.js';
 const log = createLogger('workflow-service');
 const WORKFLOW_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-_]*$/;
 
+// Validation limits
+const MAX_WORKFLOWS = 200;
+const MAX_WORKFLOW_NAME_LENGTH = 200;
+const MAX_WORKFLOW_DESCRIPTION_LENGTH = 2000;
+const MAX_AGENTS_PER_WORKFLOW = 20;
+const MAX_STEPS_PER_WORKFLOW = 50;
+
 export class WorkflowService {
   private workflowsDir: string;
   private cache: Map<string, WorkflowDefinition> = new Map();
@@ -110,8 +117,24 @@ export class WorkflowService {
 
     const normalizedId = this.normalizeWorkflowId(workflow.id);
     const filePath = path.join(this.workflowsDir, `${normalizedId}.yml`);
-    const content = yaml.stringify(workflow);
 
+    // Check if this is a new workflow (not an update)
+    try {
+      await fs.access(filePath);
+      // File exists, this is an update
+    } catch {
+      // New workflow - check count limit
+      const files = await fs.readdir(this.workflowsDir).catch(() => []);
+      const workflowCount = files.filter((f) => f.endsWith('.yml') || f.endsWith('.yaml')).length;
+
+      if (workflowCount >= MAX_WORKFLOWS) {
+        throw new ValidationError(
+          `Maximum workflow limit (${MAX_WORKFLOWS}) reached. Delete unused workflows before creating new ones.`
+        );
+      }
+    }
+
+    const content = yaml.stringify(workflow);
     await fs.writeFile(filePath, content, 'utf-8');
 
     // Update cache
@@ -147,9 +170,27 @@ export class WorkflowService {
       throw new ValidationError('Workflow ID contains invalid characters');
     }
 
+    // Size limit validation
+    if (workflow.name.length > MAX_WORKFLOW_NAME_LENGTH) {
+      throw new ValidationError(
+        `Workflow name exceeds maximum length of ${MAX_WORKFLOW_NAME_LENGTH} characters`
+      );
+    }
+
+    if (workflow.description && workflow.description.length > MAX_WORKFLOW_DESCRIPTION_LENGTH) {
+      throw new ValidationError(
+        `Workflow description exceeds maximum length of ${MAX_WORKFLOW_DESCRIPTION_LENGTH} characters`
+      );
+    }
+
     // At least one agent
     if (!workflow.agents || workflow.agents.length === 0) {
       throw new ValidationError('Workflow must define at least one agent');
+    }
+
+    // Agent count limit
+    if (workflow.agents.length > MAX_AGENTS_PER_WORKFLOW) {
+      throw new ValidationError(`Workflow exceeds maximum of ${MAX_AGENTS_PER_WORKFLOW} agents`);
     }
 
     // At least one step
@@ -157,25 +198,45 @@ export class WorkflowService {
       throw new ValidationError('Workflow must define at least one step');
     }
 
-    // Validate step references
-    const agentIds = new Set(workflow.agents.map((a) => a.id));
-    const stepIds = new Set(workflow.steps.map((s) => s.id));
+    // Step count limit
+    if (workflow.steps.length > MAX_STEPS_PER_WORKFLOW) {
+      throw new ValidationError(`Workflow exceeds maximum of ${MAX_STEPS_PER_WORKFLOW} steps`);
+    }
+
+    // Check for duplicate agent IDs
+    const agentIds = workflow.agents.map((a) => a.id);
+    const uniqueAgentIds = new Set(agentIds);
+    if (agentIds.length !== uniqueAgentIds.size) {
+      const duplicates = agentIds.filter((id, index) => agentIds.indexOf(id) !== index);
+      throw new ValidationError(`Duplicate agent IDs found: ${duplicates.join(', ')}`);
+    }
+
+    // Check for duplicate step IDs
+    const stepIds = workflow.steps.map((s) => s.id);
+    const uniqueStepIds = new Set(stepIds);
+    if (stepIds.length !== uniqueStepIds.size) {
+      const duplicates = stepIds.filter((id, index) => stepIds.indexOf(id) !== index);
+      throw new ValidationError(`Duplicate step IDs found: ${duplicates.join(', ')}`);
+    }
+
+    const agentIdSet = new Set(agentIds);
+    const stepIdSet = new Set(stepIds);
 
     for (const step of workflow.steps) {
       // Agent steps must reference a valid agent
-      if ((step.type === 'agent' || step.type === 'loop') && !agentIds.has(step.agent!)) {
+      if ((step.type === 'agent' || step.type === 'loop') && !agentIdSet.has(step.agent!)) {
         throw new ValidationError(`Step ${step.id} references unknown agent ${step.agent}`);
       }
 
       // retry_step must reference a valid step
-      if (step.on_fail?.retry_step && !stepIds.has(step.on_fail.retry_step)) {
+      if (step.on_fail?.retry_step && !stepIdSet.has(step.on_fail.retry_step)) {
         throw new ValidationError(
           `Step ${step.id} retry_step references unknown step ${step.on_fail.retry_step}`
         );
       }
 
       // Loop verify_step must reference a valid step
-      if (step.loop?.verify_step && !stepIds.has(step.loop.verify_step)) {
+      if (step.loop?.verify_step && !stepIdSet.has(step.loop.verify_step)) {
         throw new ValidationError(
           `Step ${step.id} verify_step references unknown step ${step.loop.verify_step}`
         );

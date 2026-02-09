@@ -56,11 +56,12 @@ export class WorkflowStepExecutor {
       'Agent step execution (placeholder)'
     );
 
-    // TODO Phase 2: Spawn OpenClaw session
+    // Phase 2 (tracked in #110): Spawn OpenClaw session via sessions_spawn
+    // Implementation will integrate with ClawdbotAgentService pattern
     // const sessionKey = await this.spawnAgent(step.agent!, prompt, run.taskId);
     // const result = await this.waitForSession(sessionKey);
 
-    // Placeholder: Simulate agent execution
+    // Placeholder: Simulate agent execution (Phase 1 only)
     const result = `Agent ${step.agent} executed step ${step.id}\n\nPrompt:\n${prompt}\n\nSTATUS: done\nOUTPUT: Placeholder result`;
 
     // Parse output
@@ -187,10 +188,11 @@ export class WorkflowStepExecutor {
   }
 
   /**
-   * Cleanup OpenClaw session (placeholder for Phase 2)
+   * Cleanup OpenClaw session (Phase 2 tracked in #110)
    */
   async cleanupSession(sessionKey: string): Promise<void> {
     log.info({ sessionKey }, 'Session cleanup (placeholder)');
-    // TODO Phase 2: Call OpenClaw session cleanup API
+    // Phase 2 (tracked in #110): Call OpenClaw session cleanup API
+    // Will integrate with sessions API for proper resource cleanup
   }
 }

@@ -11,8 +11,14 @@ import { getWorkflowService } from './workflow-service.js';
 import { WorkflowStepExecutor } from './workflow-step-executor.js';
 import { getWorkflowRunsDir } from '../utils/paths.js';
 import { createLogger } from '../lib/logger.js';
+import { broadcastWorkflowStatus } from './broadcast-service.js';
+import { getTaskService } from './task-service.js';
 
 const log = createLogger('workflow-run');
+
+// Concurrency limits
+const MAX_CONCURRENT_RUNS = 10;
+let activeRunCount = 0;
 const RUN_ID_PATTERN = /^run_\d{10,}_[a-zA-Z0-9_-]{6,}$/;
 
 class NotFoundError extends Error {
@@ -68,15 +74,23 @@ export class WorkflowRunService {
   async startRun(
     workflowId: string,
     taskId?: string,
-    initialContext?: Record<string, any>
+    initialContext?: Record<string, unknown>
   ): Promise<WorkflowRun> {
+    // Check concurrency limit
+    if (activeRunCount >= MAX_CONCURRENT_RUNS) {
+      throw new ValidationError(
+        `Maximum concurrent workflow runs (${MAX_CONCURRENT_RUNS}) exceeded. Wait for active runs to complete.`
+      );
+    }
+
     const workflow = await this.workflowService.loadWorkflow(workflowId);
     if (!workflow) {
       throw new NotFoundError(`Workflow ${workflowId} not found`);
     }
 
-    // TODO Phase 2: Load full task payload
-    // const task = taskId ? await taskService.getTask(taskId) : null;
+    // Load full task payload if taskId provided
+    const taskService = getTaskService();
+    const task = taskId ? await taskService.getTask(taskId) : null;
 
     const runId = `run_${Date.now()}_${nanoid(8)}`;
     const now = new Date().toISOString();
@@ -91,6 +105,9 @@ export class WorkflowRunService {
       context: {
         // Workflow variables
         ...workflow.variables,
+
+        // Task payload (if provided)
+        ...(task ? { task } : {}),
 
         // Custom initial context (from API caller)
         ...initialContext,
@@ -127,6 +144,9 @@ export class WorkflowRunService {
    * Execute the workflow run (iterates through steps with retry logic)
    */
   private async executeRun(run: WorkflowRun, workflow: WorkflowDefinition): Promise<void> {
+    // Increment active run counter
+    activeRunCount++;
+
     try {
       // Build initial step queue (skip already completed/skipped steps on resume)
       const stepQueue: string[] = this.buildStepQueue(run, workflow);
@@ -144,6 +164,7 @@ export class WorkflowRunService {
         // Update current step
         run.currentStep = step.id;
         await this.saveRun(run);
+        broadcastWorkflowStatus(run);
 
         const stepRun = existingStepRun;
         stepRun.status = 'running';
@@ -165,12 +186,14 @@ export class WorkflowRunService {
           run.context[step.id] = result.output;
 
           await this.saveRun(run);
+          broadcastWorkflowStatus(run);
         } catch (err: any) {
           // Step failed
           stepRun.status = 'failed';
           stepRun.error = err.message;
           stepRun.completedAt = new Date().toISOString();
           await this.saveRun(run);
+          broadcastWorkflowStatus(run);
 
           // Handle failure policy
           const handled = await this.handleStepFailure(step, stepRun, stepQueue, workflow, run);
@@ -195,15 +218,20 @@ export class WorkflowRunService {
       run.status = 'completed';
       run.completedAt = new Date().toISOString();
       await this.saveRun(run);
+      broadcastWorkflowStatus(run);
 
       log.info({ runId: run.id, workflowId: run.workflowId }, 'Workflow run completed');
-    } catch (err: any) {
+    } catch (err: unknown) {
       run.status = 'failed';
-      run.error = err.message;
+      run.error = err instanceof Error ? err.message : 'Unknown error';
       run.completedAt = new Date().toISOString();
       await this.saveRun(run);
+      broadcastWorkflowStatus(run);
 
       log.error({ runId: run.id, err }, 'Workflow run failed');
+    } finally {
+      // Decrement active run counter
+      activeRunCount--;
     }
   }
 
