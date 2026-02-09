@@ -15,8 +15,8 @@ export interface WorkflowDefinition {
   config?: WorkflowConfig;
   agents: WorkflowAgent[];
   steps: WorkflowStep[];
-  variables?: Record<string, any>;
-  schemas?: Record<string, any>;
+  variables?: Record<string, unknown>;
+  schemas?: Record<string, unknown>;
 }
 
 export interface WorkflowConfig {
@@ -32,6 +32,7 @@ export interface WorkflowAgent {
   role: string; // maps to toolPolicy
   model?: string; // default model for this agent
   description: string;
+  tools?: string[]; // Phase 2: Tool restrictions (#110)
 }
 
 export type StepType = 'agent' | 'loop' | 'gate' | 'parallel';
@@ -42,6 +43,7 @@ export interface WorkflowStep {
   agent?: string; // agent ID (required for type=agent|loop)
   type: StepType;
   fresh_session?: boolean;
+  session?: 'fresh' | 'reuse'; // Phase 2: Session management (#111)
   input?: string; // Jinja2 template
   output?: StepOutput;
   acceptance_criteria?: string[];
@@ -63,6 +65,7 @@ export interface StepOutput {
 
 export interface FailurePolicy {
   retry?: number;
+  retry_delay_ms?: number; // Phase 2: Delay between retries (#113)
   retry_step?: string; // Retry a different step ID
   escalate_to?: 'human' | `agent:${string}` | 'skip';
   escalate_message?: string;
@@ -97,9 +100,10 @@ export interface WorkflowRun {
   taskId?: string; // Optional task association
   status: WorkflowRunStatus;
   currentStep?: string; // Current step ID
-  context: Record<string, any>; // Shared context across steps
+  context: Record<string, unknown>; // Shared context across steps
   startedAt: string;
   completedAt?: string;
+  lastCheckpoint?: string; // Phase 2: Last state persistence timestamp (#113)
   error?: string;
   steps: StepRun[];
 }
@@ -128,7 +132,7 @@ export interface StepRun {
 // ==================== Step Execution Types ====================
 
 export interface StepExecutionResult {
-  output: any; // Parsed output (for context passing)
+  output: unknown; // Parsed output (for context passing)
   outputPath: string; // Path to output file
 }
 
@@ -151,7 +155,7 @@ export interface WorkflowAuditEvent {
   action: 'create' | 'edit' | 'delete' | 'run';
   workflowId: string;
   workflowVersion?: number;
-  changes?: Array<{ field: string; oldValue: any; newValue: any }>;
+  changes?: Array<{ field: string; oldValue: unknown; newValue: unknown }>;
   runId?: string;
 }
 

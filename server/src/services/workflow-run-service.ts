@@ -113,8 +113,16 @@ export class WorkflowRunService {
         ...initialContext,
 
         // Run metadata
-        workflow: { id: workflow.id, version: workflow.version },
+        workflow: {
+          id: workflow.id,
+          version: workflow.version,
+          // Phase 2: Store agent definitions for tool policy access (#110)
+          agents: workflow.agents,
+        },
         run: { id: runId, startedAt: now },
+
+        // Phase 2: Session tracking for reuse mode (#111)
+        _sessions: {},
       },
       startedAt: now,
       steps: workflow.steps.map((step) => ({
@@ -254,6 +262,15 @@ export class WorkflowRunService {
       stepRun.retries++;
       stepRun.status = 'pending';
       stepRun.error = undefined;
+
+      // Phase 2: Apply retry delay if specified (#113)
+      if (policy.retry_delay_ms && policy.retry_delay_ms > 0) {
+        log.info(
+          { stepId: step.id, retry: stepRun.retries, delayMs: policy.retry_delay_ms },
+          'Delaying retry'
+        );
+        await new Promise((resolve) => setTimeout(resolve, policy.retry_delay_ms));
+      }
 
       // Re-queue this step at the front
       stepQueue.unshift(step.id);
@@ -456,7 +473,7 @@ export class WorkflowRunService {
   /**
    * Resume a blocked workflow run
    */
-  async resumeRun(runId: string, resumeContext?: Record<string, any>): Promise<WorkflowRun> {
+  async resumeRun(runId: string, resumeContext?: Record<string, unknown>): Promise<WorkflowRun> {
     const run = await this.getRun(runId);
     if (!run) {
       throw new NotFoundError(`Run ${runId} not found`);
@@ -498,10 +515,14 @@ export class WorkflowRunService {
 
   /**
    * Save run state to disk
+   * Phase 2: Updates lastCheckpoint timestamp on every save
    */
   private async saveRun(run: WorkflowRun): Promise<void> {
     const runDir = path.join(this.runsDir, run.id);
     await fs.mkdir(runDir, { recursive: true });
+
+    // Update checkpoint timestamp
+    run.lastCheckpoint = new Date().toISOString();
 
     const runPath = path.join(runDir, 'run.json');
     await fs.writeFile(runPath, JSON.stringify(run, null, 2), 'utf-8');
