@@ -283,6 +283,443 @@ Automated staleness detection for project documentation.
 
 ---
 
+## Workflow Engine (v3.0.0)
+
+A deterministic multi-step agent orchestration system for repeatable, observable, and reliable agent execution. Think GitHub Actions for AI agents.
+
+### Overview
+
+The workflow engine transforms Veritas Kanban from an ad-hoc task board into a full-featured agent orchestration platform. Define multi-step pipelines as version-controlled YAML files, execute them with loops, gates, and parallel steps, and monitor everything in real time through the dashboard.
+
+**What it does:**
+
+- Coordinates multiple agents across sequential or parallel steps
+- Manages state persistence, retries, and human escalation
+- Provides real-time visibility into workflow execution
+- Enforces tool policies and session isolation for security
+
+**What it is NOT:**
+
+- Not a general-purpose workflow engine (Temporal, Airflow) — optimized for AI agents
+- Not a replacement for OpenClaw — workflows invoke OpenClaw sessions
+- Not a programming language — declarative YAML, not imperative scripts
+
+### Core Principles
+
+1. **Deterministic Execution** — Same workflow + same inputs = same execution path (modulo agent non-determinism)
+2. **Agent-Agnostic** — Workflows don't care which LLM/agent runs steps (OpenClaw handles that)
+3. **YAML-First** — Workflows are version-controlled YAML files, not database records
+4. **Observable** — Every step logs outputs, status broadcasts via WebSocket
+5. **Fail-Safe** — Explicit retry/escalation policies, no silent failures
+6. **Fresh Context by Default** — Each step spawns a fresh OpenClaw session (prevents context bleed)
+
+### Workflow Definitions
+
+Workflows are defined as YAML files stored in `.veritas-kanban/workflows/`:
+
+```yaml
+id: feature-dev-simple
+name: Feature Development Workflow
+version: 1
+description: |
+  Plan → Implement → Verify pipeline for feature development.
+
+config:
+  timeout: 7200 # Max workflow duration (seconds)
+  fresh_session_default: true
+  progress_file: progress.md
+  telemetry_tags: ['workflow', 'feature-dev']
+
+agents:
+  - id: planner
+    name: Planner
+    role: analysis # Maps to tool policy
+    model: github-copilot/claude-opus-4.6
+    description: Task decomposition specialist
+
+  - id: developer
+    name: Developer
+    role: coding
+    model: github-copilot/claude-sonnet-4.5
+    description: Feature implementation
+
+steps:
+  - id: plan
+    name: 'Plan: Decompose task'
+    agent: planner
+    type: agent
+    fresh_session: true
+    input: |
+      Decompose this task into implementable stories.
+
+      TASK: {{task.title}}
+      {{task.description}}
+
+      Output YAML:
+      stories:
+        - id: story-1
+          title: ...
+    output:
+      file: plan.yml
+    acceptance_criteria:
+      - 'Output contains valid YAML'
+      - 'At least 3 stories defined'
+    on_fail:
+      retry: 2
+      escalate_to: human
+    timeout: 600
+
+  - id: implement
+    name: 'Implement: Code stories'
+    agent: developer
+    type: agent
+    input: |
+      Implement these stories:
+      {{plan.output}}
+    output:
+      file: implementation.md
+    on_fail:
+      retry: 1
+```
+
+### Step Types
+
+#### 1. Agent Steps
+
+Execute a single agent prompt with configurable retries.
+
+**Configuration:**
+
+```yaml
+- id: review
+  name: 'Review: Code quality check'
+  agent: reviewer
+  type: agent
+  session:
+    mode: fresh # fresh | reuse
+    context: minimal # minimal | full | custom
+    cleanup: delete # delete | keep
+    timeout: 300 # seconds
+  input: |
+    Review this code:
+    {{implement.output}}
+  output:
+    file: review.md
+  acceptance_criteria:
+    - 'DECISION: approved'
+  on_fail:
+    retry: 2
+    escalate_to: human
+```
+
+**Features:**
+
+- Template rendering with `{{variable}}` and `{{nested.path}}` substitution
+- Acceptance criteria validation (substring, regex, JSON path)
+- Retry routing: retry same step, retry different step, escalate
+
+#### 2. Loop Steps (#112)
+
+Iterate over collections with progress tracking.
+
+**Configuration:**
+
+```yaml
+- id: process-stories
+  name: 'Process: Implement stories'
+  type: loop
+  agent: developer
+  loop:
+    over: '{{plan.stories}}' # Expression returning array
+    item_var: story # Variable name for current item
+    index_var: index # Loop index variable
+    completion: all_done # all_done | any_done | first_success
+    fresh_session_per_iteration: true # Spawn new session per iteration
+    max_iterations: 20 # Safety limit
+    continue_on_error: false # Skip failed iterations
+  input: |
+    Implement story {{loop.index + 1}}/{{loop.total}}:
+
+    STORY: {{story.title}}
+    {{story.description}}
+
+    COMPLETED: {{loop.completed | join(", ")}}
+  output:
+    file: 'implement-{{loop.index}}.md'
+```
+
+**Features:**
+
+- Loop state tracking: `totalIterations`, `currentIteration`, `completedIterations`, `failedIterations`
+- Completion policies:
+  - `all_done` — All iterations must complete successfully
+  - `any_done` — Stop after first successful iteration
+  - `first_success` — Stop immediately when one succeeds
+- Loop variables in templates: `{{loop.index}}`, `{{loop.total}}`, `{{loop.completed}}`
+- Max 1000 iterations safety limit
+
+#### 3. Gate Steps
+
+Conditional blocking with human approval workflow.
+
+**Configuration:**
+
+```yaml
+- id: quality-gate
+  name: 'Gate: Quality Check'
+  type: gate
+  condition: '{{test.status == "passed" and verify.decision == "approved"}}'
+  on_false:
+    escalate_to: human
+    escalate_message: 'Quality gate failed — manual review required'
+```
+
+**Features:**
+
+- Boolean expressions: `==`, `and`, `or` operators with variable access
+- Blocking behavior: run status changes to `blocked` if condition fails
+- Approval API: `POST /api/workflow-runs/:runId/steps/:stepId/approve` and `/reject`
+- Timeout support (planned)
+
+#### 4. Parallel Steps
+
+Fan-out/fan-in execution with multiple sub-steps running concurrently.
+
+**Configuration:**
+
+```yaml
+- id: parallel-tests
+  name: 'Parallel: Run test suites'
+  type: parallel
+  parallel:
+    completion: all # all | any | N (number)
+    fail_fast: true # Abort others when one fails
+    timeout: 1800 # Max wait time (seconds)
+    steps:
+      - id: unit-tests
+        agent: tester
+        input: 'Run unit tests'
+      - id: integration-tests
+        agent: tester
+        input: 'Run integration tests'
+      - id: e2e-tests
+        agent: tester
+        input: 'Run E2E tests'
+```
+
+**Features:**
+
+- Completion criteria:
+  - `all` — All sub-steps must succeed
+  - `any` — At least one sub-step must succeed
+  - `N` — At least N sub-steps must succeed
+- Fail-fast mode aborts remaining sub-steps on first failure
+- Aggregated JSON output with per-sub-step status and errors
+- Max 50 concurrent sub-steps (soft limit)
+
+### Run State Management
+
+Every workflow run persists its state to disk, enabling:
+
+- **Server restart recovery** — Runs can resume from last checkpoint
+- **Retry with exponential backoff** — Configurable `retry_delay_ms` prevents rapid retry loops
+- **Progress file tracking** — Shared `progress.md` per run for context passing:
+  - Each step appends its output with timestamp
+  - Templates can access `{{progress}}` for previous step context
+  - Templates can access `{{steps.step-id.output}}` for specific step outputs
+- **Session tracking** — Session keys stored in `run.context._sessions` per agent
+
+**Run lifecycle:**
+
+```
+pending → running → completed
+                 ↘ failed
+                 ↘ blocked (gate failure, escalation)
+```
+
+### Tool Policies (#110)
+
+Role-based tool restrictions for least-privilege security.
+
+**Default roles:**
+
+| Role        | Allowed Tools                                            | Denied Tools               | Use Case                                        |
+| ----------- | -------------------------------------------------------- | -------------------------- | ----------------------------------------------- |
+| `planner`   | Read, web_search, web_fetch, browser, image, nodes       | Write, Edit, exec, message | Analysis and planning — read-only access        |
+| `developer` | `*` (all tools)                                          | none                       | Feature implementation — full access            |
+| `reviewer`  | Read, exec, web_search, web_fetch, browser, image, nodes | Write, Edit, message       | Code review — can run tests but not modify code |
+| `tester`    | Read, exec, browser, web_search, web_fetch, image, nodes | Write, Edit, message       | Testing — can interact with UIs and run tests   |
+| `deployer`  | `*` (all tools)                                          | none                       | Deployment operations — full access             |
+
+**Custom policies:**
+
+- Create custom roles via `POST /api/tool-policies`
+- Edit existing policies via `PUT /api/tool-policies/:role`
+- Delete custom policies (default roles are immutable)
+- Settings UI tab for visual management
+
+**Enforcement:**
+
+- Tool filter passed to OpenClaw `sessions_spawn` (ready for integration)
+- Denied list takes precedence over allowed list
+
+### Session Management (#111)
+
+Each workflow step can run in an isolated OpenClaw session.
+
+**Session configuration:**
+
+```yaml
+session:
+  mode: fresh # fresh | reuse
+  context: minimal # minimal | full | custom
+  cleanup: delete # delete | keep
+  timeout: 300 # seconds
+  includeOutputsFrom: [step-1, step-2] # for context: custom
+```
+
+**Session modes:**
+
+- **`fresh`** (default) — Spawn a new session for each step
+  - Prevents context window bloat
+  - Isolates steps from each other
+  - Enables agent specialization
+
+- **`reuse`** — Continue the existing session for this agent
+  - Preserves conversation history
+  - Useful for multi-turn interactions
+
+**Context injection modes:**
+
+- **`minimal`** — Only task metadata and workflow context
+  - Smallest context window
+  - Best for independent steps
+
+- **`full`** — All previous step outputs + workflow variables
+  - Maximum context
+  - Useful for steps that need comprehensive history
+
+- **`custom`** — Explicitly list which previous steps' outputs to include
+  - Surgical context control
+  - Balance between minimal and full
+
+**Cleanup policies:**
+
+- **`delete`** — Terminate session after step completes (recommended for production)
+- **`keep`** — Leave session running for debugging
+
+### Dashboard (#114)
+
+Real-time monitoring for workflow execution.
+
+**Summary cards:**
+
+- Total workflows defined
+- Active runs (currently executing)
+- Completed runs (period-filtered: 24h/7d/30d)
+- Failed runs (period-filtered)
+- Average run duration
+- Success rate (%)
+
+**Active runs table:**
+
+- Live-updating list of currently executing runs
+- Workflow ID, status badge, started time, duration, current step, progress (step X/Y)
+- Click to open WorkflowRunView
+- Real-time updates via WebSocket
+- Visual progress bars
+
+**Recent runs history:**
+
+- Last 50 workflow runs (filterable by status)
+- Run ID, status badge, start time, duration, steps completed
+- Click to open WorkflowRunView
+
+**Workflow health metrics:**
+
+- Per-workflow success rate
+- Per-workflow average duration
+- Run counts (total, completed, failed)
+- Visual health indicators (green/yellow/red based on success rate)
+
+### Real-Time Updates
+
+**WebSocket-primary architecture:**
+
+- All hooks now WebSocket-primary, polling is safety net only
+- When connected: 120s polling intervals (safety net)
+- When disconnected: aggressive polling resumes (10-30s)
+- Events: `workflow:status` with full run state
+- ~75% reduction in API calls when WebSocket connected
+
+**Broadcast service:**
+
+- Centralized `broadcastWorkflowStatus()` sends full run state
+- No extra HTTP fetches needed
+- Multiple clients can watch the same run (collaborative viewing)
+
+### API Endpoints
+
+| Endpoint                                       | Method | Description                                       |
+| ---------------------------------------------- | ------ | ------------------------------------------------- |
+| `/api/workflows`                               | GET    | List all workflows (metadata only)                |
+| `/api/workflows/:id`                           | GET    | Get full workflow definition                      |
+| `/api/workflows`                               | POST   | Create new workflow                               |
+| `/api/workflows/:id`                           | PUT    | Update workflow (auto-increment version)          |
+| `/api/workflows/:id`                           | DELETE | Delete workflow                                   |
+| `/api/workflows/:id/runs`                      | POST   | Start a workflow run                              |
+| `/api/workflow-runs`                           | GET    | List runs (filterable by workflow, task, status)  |
+| `/api/workflow-runs/:id`                       | GET    | Get full run state                                |
+| `/api/workflow-runs/:id/resume`                | POST   | Resume a blocked run                              |
+| `/api/workflow-runs/:id/steps/:stepId/approve` | POST   | Approve a gate step                               |
+| `/api/workflow-runs/:id/steps/:stepId/reject`  | POST   | Reject a gate step                                |
+| `/api/workflow-runs/active`                    | GET    | List currently running workflows                  |
+| `/api/workflow-runs/stats?period=7d`           | GET    | Aggregated statistics (dashboard)                 |
+| `/api/tool-policies`                           | GET    | List all tool policies                            |
+| `/api/tool-policies/:role`                     | GET    | Get policy for role                               |
+| `/api/tool-policies`                           | POST   | Create custom policy                              |
+| `/api/tool-policies/:role`                     | PUT    | Update policy                                     |
+| `/api/tool-policies/:role`                     | DELETE | Delete custom policy (default policies immutable) |
+| `/api/tool-policies/:role/validate`            | POST   | Validate tool access                              |
+
+### Security
+
+- **ReDoS protection** — Regex patterns validated with size/complexity limits
+- **Expression injection prevention** — Template evaluator only supports safe variable access and boolean operators
+- **Parallel DoS limits** — Max 50 concurrent sub-steps
+- **Gate approval validation** — Authentication and permission checks on approval endpoints
+- **Path traversal protection** — `sanitizeFilename` on all file writes
+- **RBAC** — Role-based access control with ACL files (`.acl.json`)
+- **Audit logging** — All workflow changes logged to `.audit.jsonl`
+
+### Performance
+
+- **~75% reduction in API calls** when WebSocket connected
+- **Progress file size cap** — 10MB limit prevents unbounded growth
+- **Lazy-loaded frontend** — WorkflowsPage, WorkflowDashboard only render when navigated to
+- **Memoized filters** — `useMemo` for filtered workflows/runs
+- **Skeleton loading states** — Shimmer placeholders during data fetch
+
+### Known Limitations
+
+1. **OpenClaw integration placeholder** — Step executors have integration points for OpenClaw sessions API but don't yet call `sessions_spawn` (tracked in #110, #111)
+2. **Loop verify step not wired** — `loop.verify_step` is parsed but not executed by workflow engine (tracked for Phase 5)
+3. **No schema validation** — Step outputs are not validated against JSON Schema (planned for Phase 5)
+4. **Parallel timeouts not enforced** — Parallel steps don't have a global timeout, only sub-step timeouts (planned for Phase 5)
+
+### Reference
+
+- **Architecture doc:** `docs/WORKFLOW_ENGINE_ARCHITECTURE.md`
+- **Implementation notes:**
+  - Phase 1: `docs/internal/PHASE1_IMPLEMENTATION_NOTES.md`
+  - Phase 2: `docs/internal/PHASE2_IMPLEMENTATION_NOTES.md`
+  - Phase 3: `docs/internal/PHASE3_IMPLEMENTATION_NOTES.md`
+  - Phase 4: `docs/internal/PHASE4_IMPLEMENTATION_NOTES.md`
+  - Dashboard: `docs/internal/DASHBOARD_IMPLEMENTATION_NOTES.md`
+  - Policies & Sessions: `docs/internal/POLICIES_SESSIONS_IMPLEMENTATION_NOTES.md`
+
+---
+
 ## GitHub Issues Sync
 
 Bidirectional sync between GitHub Issues and your Kanban board.

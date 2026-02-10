@@ -10,7 +10,7 @@ Built for developers who want a visual Kanban board that works with autonomous c
 
 [![CI](https://github.com/BradGroux/veritas-kanban/actions/workflows/ci.yml/badge.svg)](https://github.com/BradGroux/veritas-kanban/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.1.4-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -142,6 +142,26 @@ Open [http://localhost:3000](http://localhost:3000) — that's it. The board aut
 - **Multiple attempts** — Retry with different agents, preserve history
 - **Running indicator** — Visual feedback when agents are working
 
+### 🔄 Workflow Engine (v3.0)
+
+- **YAML workflow definitions** — Define multi-step agent orchestration pipelines as version-controlled YAML files
+- **Visual execution** — Live run view with step-by-step progress, status indicators, and output preview
+- **Sequential & advanced step types** — Agent steps, loop iteration, gate approval, parallel fan-out/fan-in
+- **Loop steps** — Iterate over collections (subtasks, test cases, stories) with configurable completion policies (all_done, any_done, first_success)
+- **Gate steps** — Conditional blocking with human approval, timeout escalation, and expression-based conditions
+- **Parallel steps** — Execute multiple sub-steps concurrently with completion criteria (all, any, N-of-M)
+- **Run state management** — Persistent run state survives server restarts, retry with exponential backoff, resume blocked runs
+- **Tool policies** — Role-based tool restrictions (5 default roles: planner, developer, reviewer, tester, deployer) with custom role CRUD
+- **Session isolation** — Each workflow step can run in a fresh OpenClaw session with configurable context injection (minimal/full/custom)
+- **Monitoring dashboard** — Summary cards (total, active, completed, failed, success rate, avg duration), live active runs table, recent history, per-workflow health metrics
+- **Real-time updates** — WebSocket-primary with polling fallback; 75% reduction in API calls when connected
+- **Workflow API** — 9 CRUD endpoints for workflow definitions, runs, and control (start, resume, approve gates)
+- **Enhanced acceptance criteria** — Regex patterns, JSON path equality checks, substring matching for step validation
+- **Security hardening** — ReDoS protection, expression injection prevention, parallel DoS limits, gate approval validation
+- **Progress file tracking** — Shared `progress.md` per run for context passing between steps
+- **Audit logging** — Every workflow change (create/edit/delete) logged to `.veritas-kanban/workflows/.audit.jsonl`
+- **RBAC** — Role-based access control for workflow execution, editing, and viewing
+
 ### 🔄 Visibility & Automation
 
 - **GitHub Issues sync** — Bidirectional sync between GitHub Issues and your board (inbound import, outbound status/comment push)
@@ -239,13 +259,13 @@ Open [http://localhost:3000](http://localhost:3000) — that's it. The board aut
 │    http://localhost:3001     │
 │                              │
 │  ┌───────┐  ┌───────────┐    │
-│  │ Tasks │  │  Agents   │    │
-│  │  API  │  │  Service  │    │
+│  │ Tasks │  │ Workflows │    │
+│  │  API  │  │   Engine  │    │
 │  └───┬───┘  └─────┬─────┘    │
 │      │            │          │
 │      ▼            ▼          │
-│   Markdown    Agent Request  │
-│    Files       Files (.json) │
+│   Markdown    YAML Workflows │
+│    Files       + Run State   │
 └──────────────────────────────┘
            │
            ▼
@@ -253,7 +273,7 @@ Open [http://localhost:3000](http://localhost:3000) — that's it. The board aut
    http://localhost:3000
 ```
 
-The board is the source of truth. Agents interact via the REST API — create tasks, update status, track time, submit completions. The frontend reflects everything in real time over WebSocket. No vendor lock-in: if it can make HTTP calls, it can drive the board.
+The board is the source of truth. Agents interact via the REST API — create tasks, start workflows, update status, track time, submit completions. Workflows orchestrate multi-step agent pipelines with loops, gates, and parallel execution. The frontend reflects everything in real time over WebSocket. No vendor lock-in: if it can make HTTP calls, it can drive the board.
 
 ---
 
@@ -288,12 +308,15 @@ veritas-kanban/                  ← pnpm monorepo
 │
 └── .veritas-kanban/             ← Runtime config & data
     ├── config.json
+    ├── workflows/               ← YAML workflow definitions
+    ├── workflow-runs/           ← Run state & step outputs
+    ├── tool-policies/           ← Role-based tool restrictions
     ├── worktrees/
     ├── logs/
     └── agent-requests/
 ```
 
-**Data flow:** Web ↔ REST API / WebSocket ↔ Server ↔ Markdown files on disk
+**Data flow:** Web ↔ REST API / WebSocket ↔ Server ↔ Markdown/YAML files on disk
 
 ---
 

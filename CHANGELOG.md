@@ -5,6 +5,182 @@ All notable changes to Veritas Kanban are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-02-09
+
+### ✨ Highlights
+
+**Veritas Kanban 3.0 ships the workflow engine** — a deterministic multi-step agent orchestration system that transforms VK from an ad-hoc task board into a repeatable, observable, and reliable agent execution platform. Think GitHub Actions for AI agents.
+
+**14,079 lines of code shipped across 6 major phases:**
+
+- Phase 1: Core workflow engine (~7,091 lines)
+- Phase 2: Run state management (~1,409 lines)
+- Phase 3: Frontend + real-time updates (~3,069 lines)
+- Phase 4: Advanced orchestration (~2,255 lines)
+- Dashboard: Monitoring & health metrics (~2,050 lines)
+- Policies & Sessions: Tool policies + session isolation (~1,200 lines)
+
+### Added
+
+#### Core Workflow Engine (Phase 1 — #107)
+
+- **YAML workflow definitions** — Define multi-step agent pipelines as version-controlled YAML files
+- **Workflow CRUD API** — 9 REST endpoints for workflow management:
+  - `GET /api/workflows` — List all workflows
+  - `GET /api/workflows/:id` — Get workflow definition
+  - `POST /api/workflows` — Create workflow
+  - `PUT /api/workflows/:id` — Update workflow (auto-increment version)
+  - `DELETE /api/workflows/:id` — Delete workflow
+  - `POST /api/workflows/:id/runs` — Start a run
+  - `GET /api/workflow-runs` — List runs (filterable by workflow, task, status)
+  - `GET /api/workflow-runs/:id` — Get run details
+  - `POST /api/workflow-runs/:id/resume` — Resume blocked run
+- **Sequential step execution** — Execute workflow steps in order with retry routing
+- **Step types: agent** — Agent steps spawn OpenClaw sessions with prompts (Phase 1 placeholder)
+- **Template rendering** — Basic `{{variable}}` and `{{nested.path}}` substitution in step inputs
+- **Acceptance criteria validation** — Simple substring matching for step completion checks
+- **Retry routing** — Three strategies: retry same step, retry different step (`retry_step`), escalate to human
+- **Workflow snapshot** — YAML saved in run directory for version immutability
+- **RBAC** — Role-based access control with ACL files (`.acl.json`)
+- **Audit logging** — All workflow changes logged to `.audit.jsonl`
+- **Zod validation** — Schema validation for workflow definitions
+- **Storage structure** — File-based persistence in `.veritas-kanban/workflows/` and `.veritas-kanban/workflow-runs/`
+
+#### Run State Management (Phase 2 — #113, #110, #111, #108)
+
+- **Persistent run state** — Run state survives server restarts via checkpoint timestamps
+- **Progress file tracking** (#108) — Shared `progress.md` per run for context passing between steps
+- **Step output resolution** — Template variables like `{{steps.plan.output}}` resolve from previous step outputs
+- **Retry delays** — Configurable `retry_delay_ms` to prevent rapid retry loops
+- **Tool policies** (#110) — Role-based tool restrictions:
+  - 5 default roles: `planner`, `developer`, `reviewer`, `tester`, `deployer`
+  - Each role has allowed/denied tool lists
+  - Custom role CRUD via `/api/tool-policies` endpoints
+  - Tool filter passed to OpenClaw sessions (ready for Phase 3 integration)
+- **Fresh session per step** (#111) — Each workflow step can spawn a fresh OpenClaw session:
+  - Session modes: `fresh` (new session) or `reuse` (continue existing)
+  - Context injection: `minimal`, `full`, or `custom` (specify which steps to include)
+  - Cleanup modes: `delete` (terminate after step) or `keep` (leave running for debugging)
+  - Configurable timeout per step
+- **Session tracking** — Session keys stored in `run.context._sessions` per agent
+- **Backward compatible** — Legacy `fresh_session: false` maps to `session: reuse`
+
+#### Frontend + Real-Time Updates (Phase 3 — #107 frontend)
+
+- **WorkflowsPage** — Browse and start workflow runs:
+  - Grid view of all workflows with metadata (name, version, agents, steps)
+  - "Start Run" button → calls `POST /api/workflows/:id/run`
+  - Active run count badges per workflow
+  - Search filter
+  - Lazy-loaded in App.tsx
+- **WorkflowRunView** — Live step-by-step workflow run visualization:
+  - Real-time step progress display
+  - Each step shows status, agent, duration, retry count, output preview, errors
+  - Color-coded step status (green=completed, blue=running, red=failed, yellow=skipped, gray=pending)
+  - "Resume" button for blocked runs
+  - Overall progress bar (step X of Y)
+  - Auto-updates via WebSocket `workflow:status` events
+- **WorkflowRunList** — Filter and browse runs:
+  - Filter by status (all, running, completed, failed, blocked, pending)
+  - Click to open WorkflowRunView
+  - Progress bars, duration tracking
+- **WorkflowSection** — Run workflows from TaskDetailPanel:
+  - Shows available workflows
+  - Displays active runs for current task
+  - "Start" button with task context
+  - Dialog modal
+- **Navigation tab** — "Workflows" tab added to header with icon
+- **WebSocket integration** — Real-time updates via `workflow:status` events
+- **Polling fallback** — Aggressive polling (10-30s) when WebSocket disconnected, safety-net polling (120s) when connected
+- **~75% reduction in API calls** when WebSocket connected
+
+#### Advanced Orchestration (Phase 4 — #112, #113)
+
+- **Loop steps** (#112) — Iterate over collections with progress tracking:
+  - Configuration: `over`, `item_var`, `index_var`, `completion` policy, `fresh_session_per_iteration`
+  - Completion policies: `all_done`, `any_done`, `first_success`
+  - Loop state tracking: `totalIterations`, `currentIteration`, `completedIterations`, `failedIterations`
+  - Output per iteration saved to `step-outputs/<step-id>-<iteration>.md`
+  - Loop variables accessible in templates: `{{loop.index}}`, `{{loop.total}}`, `{{loop.completed}}`
+  - Max 1000 iterations safety limit
+  - `continue_on_error` flag to skip failed iterations
+  - `verify_each` and `verify_step` for post-iteration validation (wired in types, executor pending)
+- **Gate steps** — Conditional blocking with approval workflow:
+  - Boolean expressions: `{{test.status == "passed" and verify.decision == "approved"}}`
+  - Supports `==`, `and`, `or` operators with variable access
+  - Blocking behavior: run status changes to `blocked` if condition fails
+  - Approval API: `POST /api/workflow-runs/:runId/steps/:stepId/approve` and `/reject`
+  - Escalation policies: `escalate_to: human` blocks, timeout support
+- **Parallel steps** — Fan-out/fan-in execution:
+  - Execute multiple sub-steps concurrently via `Promise.allSettled()`
+  - Completion criteria: `all` (all must succeed), `any` (at least one), `N` (at least N sub-steps)
+  - `fail_fast` flag aborts remaining sub-steps on first failure
+  - Aggregated JSON output with per-sub-step status, outputs, errors
+  - Max 50 concurrent sub-steps (soft limit)
+- **Enhanced acceptance criteria** — Regex patterns and JSON path equality:
+  - Regex: `/^STATUS:\s*done$/i`
+  - JSON path: `output.decision == "approved"`
+  - Backward compatible substring matching
+- **Expression evaluator** — Safe variable access and boolean logic (no arbitrary code execution)
+
+#### Workflow Dashboard (#114)
+
+- **Summary cards** (6 metrics):
+  - Total workflows defined
+  - Active runs (currently executing)
+  - Completed runs (period-filtered: 24h/7d/30d)
+  - Failed runs (period-filtered)
+  - Average run duration
+  - Success rate (%)
+- **Active runs table** — Live-updating list of currently executing runs:
+  - Workflow ID, status badge, started time, duration, current step, progress (step X/Y)
+  - Click to open WorkflowRunView
+  - Real-time updates via WebSocket
+  - Visual progress bars
+- **Recent runs history** — Last 50 workflow runs:
+  - Sortable by status (all/completed/failed/blocked/pending)
+  - Run ID, status badge, start time, duration, steps completed
+  - Click to open WorkflowRunView
+- **Workflow health metrics** — Per-workflow stats:
+  - Success rate
+  - Average duration
+  - Run counts (total, completed, failed)
+  - Visual health indicators (green/yellow/red based on success rate)
+- **Real-time updates** — WebSocket-driven with polling fallback (30s when disconnected, 120s when connected)
+- **Backend endpoints**:
+  - `GET /api/workflow-runs/active` — Currently running workflows
+  - `GET /api/workflow-runs/stats?period=7d` — Aggregated statistics (total workflows, active, completed, failed, avg duration, success rate, per-workflow breakdown)
+- **Navigation** — "Dashboard" button in WorkflowsPage header
+
+### Changed
+
+#### WebSocket Refactor (Phase 3)
+
+- **All hooks now WebSocket-primary** — Polling is safety net only
+- **Connected behavior** — 120s polling intervals (safety net)
+- **Disconnected behavior** — Aggressive polling resumes (10-30s intervals)
+- **Events** — `task:changed`, `agent:status`, `telemetry:event`, `workflow:status`
+- **Broadcast service** — Centralized `broadcastWorkflowStatus()` function sends full run state (no extra HTTP fetches needed)
+- **13 hooks/components refactored** — All polling intervals updated
+
+### Security
+
+- **ReDoS protection** — Regex patterns validated with size/complexity limits
+- **Expression injection prevention** — Template evaluator only supports safe variable access and boolean operators
+- **Parallel DoS limits** — Max 50 concurrent sub-steps in parallel execution
+- **Gate approval validation** — Authentication and permission checks on approval endpoints
+- **Path traversal protection** — `sanitizeFilename` on all file writes
+
+### Performance
+
+- **~75% reduction in API calls** — When WebSocket connected, polling drops to 120s safety-net intervals
+- **Progress file size cap** — 10MB limit prevents unbounded growth
+- **Lazy-loaded frontend** — WorkflowsPage, WorkflowDashboard only render when navigated to
+- **Memoized filters** — `useMemo` for filtered workflows/runs
+- **Skeleton loading states** — Shimmer placeholders during data fetch
+
+---
+
 ## [2.1.4] - 2026-02-09
 
 ### Fixed
