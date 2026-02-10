@@ -57,8 +57,8 @@ const RecentRunCard = memo(function RecentRunCard({ run, onClick }: RecentRunCar
     ? Math.floor((new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()) / 1000)
     : Math.floor((Date.now() - new Date(run.startedAt).getTime()) / 1000);
 
-  const completedSteps = run.steps.filter((s) => s.status === 'completed').length;
-  const totalSteps = run.steps.length;
+  const completedSteps = run.steps?.filter((s) => s.status === 'completed').length;
+  const totalSteps = run.steps?.length ?? 0;
 
   const statusConfig = {
     pending: {

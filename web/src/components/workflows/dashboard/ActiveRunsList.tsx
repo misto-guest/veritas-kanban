@@ -32,8 +32,8 @@ interface ActiveRunCardProps {
 
 const ActiveRunCard = memo(function ActiveRunCard({ run, onClick }: ActiveRunCardProps) {
   const duration = Math.floor((Date.now() - new Date(run.startedAt).getTime()) / 1000);
-  const completedSteps = run.steps.filter((s) => s.status === 'completed').length;
-  const totalSteps = run.steps.length;
+  const completedSteps = run.steps?.filter((s) => s.status === 'completed').length;
+  const totalSteps = run.steps?.length ?? 0;
 
   return (
     <div

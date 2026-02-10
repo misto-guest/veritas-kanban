@@ -194,11 +194,11 @@ function WorkflowCard({ workflow, onStartRun, onViewRuns }: WorkflowCardProps) {
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <Users className="h-4 w-4" />
-              <span>{workflow.agents.length} agents</span>
+              <span>{workflow.agents?.length ?? 0} agents</span>
             </div>
             <div className="flex items-center gap-1">
               <ListOrdered className="h-4 w-4" />
-              <span>{workflow.steps.length} steps</span>
+              <span>{workflow.steps?.length ?? 0} steps</span>
             </div>
           </div>
         </div>

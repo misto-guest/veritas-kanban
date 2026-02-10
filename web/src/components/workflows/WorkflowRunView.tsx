@@ -197,10 +197,10 @@ export function WorkflowRunView({ runId, onBack }: WorkflowRunViewProps) {
   const workflowName = workflow?.name ?? `Workflow ${run.workflowId}`;
   const stepDefinitions =
     workflow?.steps ??
-    run.steps.map((step) => ({ id: step.stepId, name: step.stepId, agent: step.agent }));
+    run.steps?.map((step) => ({ id: step.stepId, name: step.stepId, agent: step.agent }));
 
-  const completedSteps = run.steps.filter((s) => s.status === 'completed').length;
-  const totalSteps = run.steps.length;
+  const completedSteps = run.steps?.filter((s) => s.status === 'completed').length;
+  const totalSteps = run.steps?.length ?? 0;
 
   const duration = run.completedAt
     ? Math.floor((new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()) / 1000)
@@ -312,7 +312,7 @@ export function WorkflowRunView({ runId, onBack }: WorkflowRunViewProps) {
       <div className="space-y-3">
         <h2 className="text-lg font-semibold">Steps</h2>
         {stepDefinitions.map((stepDef, index) => {
-          const stepRun = run.steps.find((s) => s.stepId === stepDef.id);
+          const stepRun = run.steps?.find((s) => s.stepId === stepDef.id);
           if (!stepRun) return null;
 
           return (
