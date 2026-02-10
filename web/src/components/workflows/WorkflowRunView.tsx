@@ -82,6 +82,7 @@ export function WorkflowRunView({ runId, onBack }: WorkflowRunViewProps) {
   const [run, setRun] = useState<WorkflowRun | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowDefinition | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isWorkflowLoading, setIsWorkflowLoading] = useState(true);
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -107,26 +108,40 @@ export function WorkflowRunView({ runId, onBack }: WorkflowRunViewProps) {
     fetchRun();
   }, [fetchRun]);
 
-  // Fetch workflow definition when run loads or changes
+  // Fetch workflow definition when run loads
   useEffect(() => {
     if (!run) return;
 
+    setWorkflow(null);
+    setIsWorkflowLoading(true);
+
+    let isCancelled = false;
     const fetchWorkflow = async () => {
       try {
         const workflowResponse = await fetch(`/api/workflows/${run.workflowId}`);
-        if (workflowResponse.ok) {
-          setWorkflow(await workflowResponse.json());
+        if (!workflowResponse.ok) throw new Error('Failed to fetch workflow definition');
+        const data = await workflowResponse.json();
+        if (!isCancelled) {
+          setWorkflow(data);
         }
       } catch (error) {
-        // Silently fail if workflow fetch fails (run data is more important)
         console.error('Failed to fetch workflow definition:', error);
+        if (!isCancelled) {
+          setWorkflow(null);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsWorkflowLoading(false);
+        }
       }
     };
 
-    if (!workflow || workflow.id !== run.workflowId) {
-      fetchWorkflow();
-    }
-  }, [run, workflow]);
+    fetchWorkflow();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [run?.workflowId]);
 
   // WebSocket subscription for live updates
   const handleWebSocketMessage = useCallback(
@@ -166,7 +181,7 @@ export function WorkflowRunView({ runId, onBack }: WorkflowRunViewProps) {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || (run && isWorkflowLoading)) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-full" />
@@ -175,9 +190,14 @@ export function WorkflowRunView({ runId, onBack }: WorkflowRunViewProps) {
     );
   }
 
-  if (!run || !workflow) {
+  if (!run) {
     return <div className="text-center py-12 text-muted-foreground">Workflow run not found</div>;
   }
+
+  const workflowName = workflow?.name ?? `Workflow ${run.workflowId}`;
+  const stepDefinitions =
+    workflow?.steps ??
+    run.steps.map((step) => ({ id: step.stepId, name: step.stepId, agent: step.agent }));
 
   const completedSteps = run.steps.filter((s) => s.status === 'completed').length;
   const totalSteps = run.steps.length;
@@ -227,7 +247,7 @@ export function WorkflowRunView({ runId, onBack }: WorkflowRunViewProps) {
             Back to Runs
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{workflow.name}</h1>
+            <h1 className="text-2xl font-bold">{workflowName}</h1>
             <p className="text-sm text-muted-foreground">Run: {run.id}</p>
           </div>
         </div>
@@ -291,7 +311,7 @@ export function WorkflowRunView({ runId, onBack }: WorkflowRunViewProps) {
       {/* Step Timeline */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold">Steps</h2>
-        {workflow.steps.map((stepDef, index) => {
+        {stepDefinitions.map((stepDef, index) => {
           const stepRun = run.steps.find((s) => s.stepId === stepDef.id);
           if (!stepRun) return null;
 
