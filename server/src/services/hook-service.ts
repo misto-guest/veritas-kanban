@@ -17,7 +17,8 @@
  */
 
 import { createLogger } from '../lib/logger.js';
-import type { Task } from '@veritas-kanban/shared';
+import type { Task, EnforcementSettings } from '@veritas-kanban/shared';
+import { getChatService } from './chat-service.js';
 
 const log = createLogger('hooks');
 
@@ -32,6 +33,7 @@ export interface HookConfig {
   webhook?: string;
   notify?: boolean;
   logActivity?: boolean;
+  squadChat?: boolean;
 }
 
 export interface HooksSettings {
@@ -60,6 +62,7 @@ export interface HookPayload {
 // ---------------------------------------------------------------------------
 
 let cachedSettings: HooksSettings | undefined;
+let cachedEnforcement: EnforcementSettings | undefined;
 
 /**
  * Set the hooks configuration. Called by settings service on load/change.
@@ -67,6 +70,23 @@ let cachedSettings: HooksSettings | undefined;
 export function setHooksSettings(settings: HooksSettings | undefined): void {
   cachedSettings = settings;
   log.info({ enabled: settings?.enabled ?? false }, 'Hooks settings updated');
+}
+
+/**
+ * Set enforcement settings. Called by settings service on load/change.
+ */
+export function setEnforcementSettings(settings: EnforcementSettings | undefined): void {
+  cachedEnforcement = settings;
+  log.info(
+    {
+      squadChat: settings?.squadChat ?? true,
+      reviewGate: settings?.reviewGate ?? true,
+      closingComments: settings?.closingComments ?? true,
+      autoTelemetry: settings?.autoTelemetry ?? true,
+      autoTimeTracking: settings?.autoTimeTracking ?? true,
+    },
+    'Enforcement settings updated'
+  );
 }
 
 /**
@@ -86,7 +106,7 @@ export function getHooksSettings(): HooksSettings | undefined {
  */
 export async function fireHook(
   event: HookEvent,
-  task: Pick<Task, 'id' | 'title' | 'status' | 'project' | 'sprint'>,
+  task: Pick<Task, 'id' | 'title' | 'status' | 'project' | 'sprint' | 'agent'>,
   previousStatus?: string
 ): Promise<void> {
   const settings = cachedSettings;
@@ -122,6 +142,13 @@ export async function fireHook(
     });
   }
 
+  // Fire squad chat if configured
+  if (hookConfig.squadChat && (cachedEnforcement?.squadChat ?? true)) {
+    fireSquadChat(event, task, previousStatus).catch((err) => {
+      log.warn({ event, taskId: task.id, error: err.message }, 'Squad chat post failed');
+    });
+  }
+
   // TODO: Fire notification if configured (integrate with notification-service)
   // if (hookConfig.notify) {
   //   notifyHookEvent(event, payload);
@@ -129,6 +156,55 @@ export async function fireHook(
 
   // Activity logging is handled by the existing activity service
   // The logActivity flag could be used to suppress logging if needed
+}
+
+/**
+ * Post a lifecycle event to squad chat.
+ * Maps hook events to human-readable messages.
+ */
+async function fireSquadChat(
+  event: HookEvent,
+  task: Pick<Task, 'id' | 'title' | 'status' | 'project' | 'sprint' | 'agent'>,
+  previousStatus?: string
+): Promise<void> {
+  const chatService = getChatService();
+
+  // Map event to human-readable message
+  const messages: Record<HookEvent, string> = {
+    onCreated: `Task created: ${task.title}`,
+    onStarted: `Started working on: ${task.title}`,
+    onBlocked: `Task blocked: ${task.title}`,
+    onCompleted: `Task completed: ${task.title}`,
+    onArchived: `Task archived: ${task.title}`,
+  };
+
+  const message = messages[event];
+  const agent = task.agent || 'veritas';
+  const tags = ['task-lifecycle'];
+
+  // Add project/sprint tags if present
+  if (task.project) tags.push(task.project);
+  if (task.sprint) tags.push(task.sprint);
+
+  // Map hook events to squad chat event types
+  const eventMap: Record<HookEvent, 'agent.status' | undefined> = {
+    onCreated: 'agent.status',
+    onStarted: 'agent.status',
+    onBlocked: 'agent.status',
+    onCompleted: 'agent.status',
+    onArchived: undefined,
+  };
+
+  await chatService.sendSquadMessage({
+    agent: agent.toUpperCase(),
+    message,
+    tags,
+    system: true,
+    event: eventMap[event],
+    taskTitle: task.title,
+  });
+
+  log.debug({ event, taskId: task.id }, 'Squad chat notification sent');
 }
 
 /**

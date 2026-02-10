@@ -2,7 +2,7 @@ import { Router, type Router as RouterType } from 'express';
 import { ConfigService } from '../services/config-service.js';
 import { getTelemetryService } from '../services/telemetry-service.js';
 import { getAttachmentService } from '../services/attachment-service.js';
-import { setHooksSettings } from '../services/hook-service.js';
+import { setEnforcementSettings, setHooksSettings } from '../services/hook-service.js';
 import type { FeatureSettings } from '@veritas-kanban/shared';
 import { FeatureSettingsPatchSchema } from '../schemas/feature-settings-schema.js';
 import { strictRateLimit } from '../middleware/rate-limit.js';
@@ -37,6 +37,9 @@ export function syncSettingsToServices(settings: FeatureSettings): void {
 
   // Sync lifecycle hooks settings
   setHooksSettings(settings.hooks);
+
+  // Sync enforcement settings
+  setEnforcementSettings(settings.enforcement);
 }
 
 function sanitizeFeatureSettings(settings: FeatureSettings): FeatureSettings {

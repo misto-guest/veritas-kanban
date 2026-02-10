@@ -60,6 +60,7 @@ export class BacklogRepository {
         attempt: frontmatter.attempt,
         attempts: frontmatter.attempts,
         reviewComments: frontmatter.reviewComments,
+        reviewScores: frontmatter.reviewScores,
         review: frontmatter.review,
         subtasks: frontmatter.subtasks,
         autoCompleteOnSubtasks: frontmatter.autoCompleteOnSubtasks,

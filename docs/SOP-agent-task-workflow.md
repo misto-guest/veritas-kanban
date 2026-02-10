@@ -83,9 +83,60 @@ curl -X POST http://localhost:3001/api/telemetry/events \
 
 ---
 
+## ⚠️ Enforcement Gates (Optional)
+
+Veritas Kanban supports **6 enforcement gates** that can harden your workflow by blocking or automating certain transitions. All gates are **disabled by default** and must be explicitly enabled.
+
+**If enforcement gates are enabled, your workflow changes:**
+
+| Gate                     | Impact on Agents                                                      |
+| ------------------------ | --------------------------------------------------------------------- |
+| `reviewGate`             | Cannot mark `done` unless all 4 review scores = 10                    |
+| `closingComments`        | Cannot mark `done` without a comment ≥20 characters                   |
+| `autoTelemetry`          | `run.*` events fire automatically — no need to POST manually          |
+| `autoTimeTracking`       | Timers auto-start/stop on status change — no manual start/stop needed |
+| `squadChat`              | Task status changes auto-post to squad chat                           |
+| `orchestratorDelegation` | Warns if orchestrator does implementation work instead of delegating  |
+
+**Check if enforcement is enabled before starting work:**
+
+```bash
+curl http://localhost:3001/api/settings/features | jq '.data.enforcement'
+```
+
+**Example response:**
+
+```json
+{
+  "reviewGate": true,
+  "closingComments": true,
+  "autoTelemetry": false,
+  "autoTimeTracking": false,
+  "squadChat": false,
+  "orchestratorDelegation": false
+}
+```
+
+**If `reviewGate` or `closingComments` are enabled:**
+
+- Check their requirements BEFORE attempting to mark a task `done`
+- The API will return `400 Bad Request` with error code and details if you violate a gate
+- See [docs/enforcement.md](enforcement.md) for full error codes and handling guide
+
+**If `autoTelemetry` or `autoTimeTracking` are enabled:**
+
+- You can SKIP manual `run.*` emission and timer start/stop calls
+- The system handles it automatically on status changes
+
+**Full enforcement documentation:** [docs/enforcement.md](enforcement.md)
+
+---
+
 ## ⚠️ Telemetry Emission (MANDATORY)
 
 The dashboard's **Success Rate**, **Token Usage**, and **Average Run Duration** graphs are powered by `run.*` telemetry events. These are **NOT auto-captured** — agents must emit them manually via `POST /api/telemetry/events`.
+
+> **Exception:** If the `autoTelemetry` enforcement gate is enabled, `run.*` events fire automatically on status changes. Check enforcement settings before emitting manually.
 
 > **This has broken multiple times** when agents lost their instructions. Add these steps to your `AGENTS.md` and treat them as non-negotiable.
 

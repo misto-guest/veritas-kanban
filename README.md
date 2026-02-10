@@ -162,6 +162,19 @@ Open [http://localhost:3000](http://localhost:3000) — that's it. The board aut
 - **Audit logging** — Every workflow change (create/edit/delete) logged to `.veritas-kanban/workflows/.audit.jsonl`
 - **RBAC** — Role-based access control for workflow execution, editing, and viewing
 
+### 🛡️ Enforcement Gates
+
+**Optional structural enforcement to harden your workflow** — all gates are disabled by default.
+
+- **squadChat** — Auto-post task lifecycle events to squad chat
+- **reviewGate** — Require 4x10 review scores before task completion
+- **closingComments** — Require deliverable summary (≥20 chars) before completion
+- **autoTelemetry** — Auto-emit `run.started`/`run.completed` on status changes
+- **autoTimeTracking** — Auto-start/stop timers on status changes
+- **orchestratorDelegation** — Warn when orchestrator does implementation work instead of delegating
+
+All gates are toggleable via `PATCH /api/settings/features` under the `enforcement` key. See [docs/enforcement.md](docs/enforcement.md) for full details, error codes, and agent integration guide.
+
 ### 🔄 Visibility & Automation
 
 - **GitHub Issues sync** — Bidirectional sync between GitHub Issues and your board (inbound import, outbound status/comment push)

@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import { createReadStream, createWriteStream } from '../storage/fs-helpers.js';
 import path from 'path';
+import { getTelemetryDir } from '../utils/paths.js';
 import { createGzip, createGunzip } from 'zlib';
 import { pipeline } from 'stream/promises';
 import readline from 'readline';
@@ -15,9 +16,8 @@ import type {
 import { createLogger } from '../lib/logger.js';
 const log = createLogger('telemetry-service');
 
-// Default paths - resolve to project root
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const TELEMETRY_DIR = path.join(PROJECT_ROOT, '.veritas-kanban', 'telemetry');
+// Default paths - resolve via shared paths helper (respects DATA_DIR/VERITAS_DATA_DIR)
+const TELEMETRY_DIR = getTelemetryDir();
 
 const DEFAULT_CONFIG: TelemetryConfig = {
   enabled: true,
@@ -106,13 +106,15 @@ export class TelemetryService {
    * Events are written asynchronously to avoid blocking the caller.
    * Writes are queued to prevent file corruption from concurrent writes.
    */
-  async emit<T extends TelemetryEvent>(event: Omit<T, 'id' | 'timestamp'>): Promise<T> {
+  async emit<T extends TelemetryEvent>(
+    event: Omit<T, 'id' | 'timestamp'> & { timestamp?: string }
+  ): Promise<T> {
     if (!this.config.enabled) {
       // Return a fake event when disabled
       return {
         ...event,
         id: `disabled_${nanoid(8)}`,
-        timestamp: new Date().toISOString(),
+        timestamp: event.timestamp ?? new Date().toISOString(),
       } as T;
     }
 
@@ -121,7 +123,7 @@ export class TelemetryService {
     const fullEvent: T = {
       ...event,
       id: `evt_${nanoid(12)}`,
-      timestamp: new Date().toISOString(),
+      timestamp: event.timestamp ?? new Date().toISOString(),
     } as T;
 
     // Add to queue with size limit - drop oldest if exceeded
