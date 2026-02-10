@@ -5,26 +5,25 @@ All notable changes to Veritas Kanban are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.1.0] - 2026-02-10
 
 ### Added
 
-#### Enforcement Gates (#115)
+- **6 structural enforcement gates** (all disabled by default):
+  - `squadChat`, `reviewGate`, `closingComments`, `autoTelemetry`, `autoTimeTracking`, `orchestratorDelegation`
+- **Comprehensive enforcement documentation** with a dedicated "For AI Agents" section
+- **Agent SOP enforcement awareness** updates
 
-- **6 structural enforcement toggles** — Optional gates to harden workflow discipline (all disabled by default):
-  - `squadChat` — Auto-post task lifecycle events to squad chat
-  - `reviewGate` — Require 4x10 review scores before task completion
-  - `closingComments` — Require deliverable summary (≥20 chars) before completion
-  - `autoTelemetry` — Auto-emit `run.started`/`run.completed` on status changes
-  - `autoTimeTracking` — Auto-start/stop timers on status changes
-  - `orchestratorDelegation` — Warn when orchestrator does implementation work instead of delegating
-- **Comprehensive documentation** — `docs/enforcement.md` covers:
-  - Gate behavior and configuration
-  - Error codes and response formats for API clients
-  - "For AI Agents" section with pre-flight checks, 400 error handling, and polling optimization
-  - Troubleshooting guide for common issues
-- **README update** — Added Enforcement Gates section in Feature Highlights with link to full docs
-- **All gates toggleable** via `PATCH /api/settings/features` under the `enforcement` key
+### Fixed
+
+- Enforcement gate logic (correct `=== true` checks)
+- TelemetryService supports backdated timestamps
+- TelemetryService respects `DATA_DIR` in Docker environments
+- Zod schema allows optional timestamp on telemetry events
+- Template YAML serialization (recursive `cleanForYaml`)
+- Case-insensitive agent color lookup in squad chat
+
+**Issue:** #115
 
 ---
 
