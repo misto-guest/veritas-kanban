@@ -24,6 +24,7 @@ import {
 import { useToast } from '@/hooks/useToast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { useWebSocket, type WebSocketMessage } from '@/hooks/useWebSocket';
 
 interface WorkflowRunViewProps {
   runId: string;
@@ -66,6 +67,15 @@ interface WorkflowDefinition {
     name: string;
     agent?: string;
   }>;
+}
+
+interface WorkflowStatusMessage extends WebSocketMessage {
+  type: 'workflow:status';
+  data: WorkflowRun;
+}
+
+function isWorkflowStatusMessage(msg: WebSocketMessage): msg is WorkflowStatusMessage {
+  return msg.type === 'workflow:status' && typeof msg.data === 'object' && msg.data !== null;
 }
 
 export function WorkflowRunView({ runId, onBack }: WorkflowRunViewProps) {
@@ -119,38 +129,20 @@ export function WorkflowRunView({ runId, onBack }: WorkflowRunViewProps) {
   }, [run, workflow]);
 
   // WebSocket subscription for live updates
-  useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
-
-    ws.onopen = () => {
-      console.log('[WorkflowRunView] WebSocket connected');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.type === 'workflow:status' && message.data?.id === runId) {
-          console.log('[WorkflowRunView] Received workflow:status update', message.data);
-          setRun(message.data);
-        }
-      } catch (error) {
-        console.error('[WorkflowRunView] Error parsing WebSocket message:', error);
+  const handleWebSocketMessage = useCallback(
+    (message: WebSocketMessage) => {
+      if (isWorkflowStatusMessage(message) && message.data.id === runId) {
+        console.log('[WorkflowRunView] Received workflow:status update', message.data);
+        setRun(message.data);
       }
-    };
+    },
+    [runId]
+  );
 
-    ws.onerror = (error) => {
-      console.error('[WorkflowRunView] WebSocket error:', error);
-    };
-
-    ws.onclose = () => {
-      console.log('[WorkflowRunView] WebSocket disconnected');
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, [runId]);
+  useWebSocket({
+    autoConnect: true,
+    onMessage: handleWebSocketMessage,
+  });
 
   const handleResume = async () => {
     try {
