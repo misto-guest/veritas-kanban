@@ -25,6 +25,16 @@ const delegationService = getDelegationService();
 const progressService = getProgressService();
 
 // Validation schemas
+const reviewCommentSchema = z.object({
+  id: z.string(),
+  file: z.string(),
+  line: z.number(),
+  content: z.string(),
+  created: z.string(),
+});
+
+const reviewScoresSchema = z.array(z.number().int().min(0).max(10)).length(4);
+
 const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().optional().default(''),
@@ -33,6 +43,8 @@ const createTaskSchema = z.object({
   project: z.string().optional(),
   sprint: z.string().optional(),
   agent: z.string().max(50).optional(), // "auto" | agent type slug
+  reviewScores: reviewScoresSchema.optional(),
+  reviewComments: z.array(reviewCommentSchema).optional(),
 });
 
 const gitSchema = z
@@ -81,14 +93,6 @@ const blockedReasonSchema = z
   .optional()
   .nullable();
 
-const reviewCommentSchema = z.object({
-  id: z.string(),
-  file: z.string(),
-  line: z.number(),
-  content: z.string(),
-  created: z.string(),
-});
-
 const reviewStateSchema = z.object({
   decision: z.enum(['approved', 'changes-requested', 'rejected']).optional(),
   decidedAt: z.string().optional(),
@@ -124,6 +128,7 @@ const updateTaskSchema = z.object({
   github: githubSchema,
   attempt: attemptSchema,
   reviewComments: z.array(reviewCommentSchema).optional(),
+  reviewScores: reviewScoresSchema.optional(),
   review: reviewStateSchema.optional(),
   subtasks: z.array(subtaskSchema).optional(),
   autoCompleteOnSubtasks: z.boolean().optional(),

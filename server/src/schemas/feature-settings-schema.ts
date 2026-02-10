@@ -128,6 +128,17 @@ const BudgetSettingsSchema = z
   .strict()
   .optional();
 
+const EnforcementSettingsSchema = z
+  .object({
+    squadChat: z.boolean().optional(),
+    reviewGate: z.boolean().optional(),
+    closingComments: z.boolean().optional(),
+    autoTelemetry: z.boolean().optional(),
+    autoTimeTracking: z.boolean().optional(),
+  })
+  .strict()
+  .optional();
+
 /**
  * Task lifecycle hooks configuration.
  *
@@ -193,6 +204,7 @@ export const FeatureSettingsPatchSchema = z
     notifications: NotificationSettingsSchema,
     archive: ArchiveSettingsSchema,
     budget: BudgetSettingsSchema,
+    enforcement: EnforcementSettingsSchema,
     hooks: HooksSettingsSchema,
     squadWebhook: SquadWebhookSettingsSchema,
   })

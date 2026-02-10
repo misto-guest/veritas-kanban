@@ -11,6 +11,8 @@ import type {
   Subtask,
   TaskTelemetryEvent,
   TimeTracking,
+  RunStartedEvent,
+  RunCompletedEvent,
 } from '@veritas-kanban/shared';
 import { getTelemetryService, type TelemetryService } from './telemetry-service.js';
 import { ConfigService } from './config-service.js';
@@ -348,6 +350,7 @@ export class TaskService {
         attempt: data.attempt,
         attempts: data.attempts,
         reviewComments,
+        reviewScores: data.reviewScores,
         review: data.review,
         subtasks: data.subtasks,
         autoCompleteOnSubtasks: data.autoCompleteOnSubtasks,
@@ -505,6 +508,45 @@ export class TaskService {
               );
             }
           }
+
+          // Enforcement: 4x10 Review Gate (only if enforcement settings are explicitly configured)
+          if (settings.enforcement && (settings.enforcement.reviewGate ?? true)) {
+            const scores = input.reviewScores ?? freshTask.reviewScores ?? [];
+            const allPerfect = scores.length === 4 && scores.every((s: number) => s === 10);
+            if (!allPerfect) {
+              throw new ValidationError(
+                'Cannot complete task without all four review scores = 10 (4x10 gate)',
+                [
+                  {
+                    code: 'REVIEW_GATE',
+                    message: 'All 4 review scores must be 10 to mark as done',
+                    path: ['reviewScores'],
+                  },
+                ]
+              );
+            }
+          }
+
+          // Enforcement: Closing Comments Required (only if enforcement settings are explicitly configured)
+          if (settings.enforcement && (settings.enforcement.closingComments ?? true)) {
+            const comments = input.reviewComments ?? freshTask.reviewComments ?? [];
+            const hasClosingComment =
+              comments.length > 0 &&
+              comments.some((c: { content: string }) => c.content && c.content.length >= 20);
+            if (!hasClosingComment) {
+              throw new ValidationError(
+                'Cannot complete task without at least one review comment with deliverable summary',
+                [
+                  {
+                    code: 'CLOSING_COMMENTS_REQUIRED',
+                    message:
+                      'At least one review comment with ≥20 characters required to mark as done',
+                    path: ['reviewComments'],
+                  },
+                ]
+              );
+            }
+          }
         }
 
         // Create a preview of the task with proposed changes for validation
@@ -572,6 +614,72 @@ export class TaskService {
           fireHook(hookEvent, updatedTask, previousStatus).catch((err) => {
             log.warn({ taskId: updatedTask.id, hookEvent }, 'Hook execution failed: %s', err);
           });
+        }
+
+        // Enforcement: Auto-telemetry emission (run.started/run.completed)
+        // Fetch settings once for enforcement checks (only if enforcement is configured)
+        const enforcementConfigService = new ConfigService();
+        const enforcementSettings = await enforcementConfigService.getFeatureSettings();
+        const autoTelemetry = enforcementSettings.enforcement
+          ? (enforcementSettings.enforcement.autoTelemetry ?? true)
+          : false;
+
+        if (autoTelemetry) {
+          const agent = updatedTask.agent || 'veritas';
+          if (updatedTask.status === 'in-progress' && previousStatus !== 'in-progress') {
+            // Emit run.started
+            this.telemetry
+              .emit<RunStartedEvent>({
+                type: 'run.started',
+                taskId: updatedTask.id,
+                agent,
+              })
+              .catch((err) => {
+                log.warn({ taskId: updatedTask.id }, 'Auto run.started emission failed: %s', err);
+              });
+          } else if (updatedTask.status === 'done' && previousStatus !== 'done') {
+            // Emit run.completed
+            const durationMs = updatedTask.timeTracking?.totalSeconds
+              ? updatedTask.timeTracking.totalSeconds * 1000
+              : 0;
+            this.telemetry
+              .emit<RunCompletedEvent>({
+                type: 'run.completed',
+                taskId: updatedTask.id,
+                agent,
+                success: true,
+                durationMs,
+              })
+              .catch((err) => {
+                log.warn({ taskId: updatedTask.id }, 'Auto run.completed emission failed: %s', err);
+              });
+          }
+        }
+
+        // Enforcement: Auto time tracking start/stop (only if enforcement is configured)
+        const autoTimeTracking = enforcementSettings.enforcement
+          ? (enforcementSettings.enforcement.autoTimeTracking ?? true)
+          : false;
+        if (autoTimeTracking) {
+          if (updatedTask.status === 'in-progress' && previousStatus !== 'in-progress') {
+            // Auto-start timer
+            if (!updatedTask.timeTracking?.isRunning) {
+              this.startTimer(updatedTask.id).catch((err) => {
+                log.warn({ taskId: updatedTask.id }, 'Auto timer start failed: %s', err);
+              });
+            }
+          } else if (
+            (updatedTask.status === 'done' || updatedTask.status === 'blocked') &&
+            previousStatus !== 'done' &&
+            previousStatus !== 'blocked'
+          ) {
+            // Auto-stop timer
+            if (updatedTask.timeTracking?.isRunning) {
+              this.stopTimer(updatedTask.id).catch((err) => {
+                log.warn({ taskId: updatedTask.id }, 'Auto timer stop failed: %s', err);
+              });
+            }
+          }
         }
 
         // Execute post-transition actions (quality gates)

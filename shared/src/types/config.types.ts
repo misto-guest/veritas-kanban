@@ -219,6 +219,15 @@ export interface BudgetSettings {
   warningThreshold: number; // Percentage threshold for warning (0-100, default 80)
 }
 
+/** Structural enforcement toggles (all on by default). */
+export interface EnforcementSettings {
+  squadChat: boolean; // Auto-post task lifecycle events to squad chat
+  reviewGate: boolean; // Require 4x10 review scores before completion
+  closingComments: boolean; // Require deliverable summary in review comments before completion
+  autoTelemetry: boolean; // Emit run.started/run.completed on status changes
+  autoTimeTracking: boolean; // Auto-start/stop timers on status changes
+}
+
 /** Individual hook configuration */
 export interface HookConfig {
   enabled: boolean;
@@ -279,6 +288,7 @@ export interface FeatureSettings {
   notifications: NotificationSettings;
   archive: ArchiveSettings;
   budget: BudgetSettings;
+  enforcement: EnforcementSettings;
   hooks: HooksSettings;
   squadWebhook: SquadWebhookSettings;
 }
@@ -353,6 +363,13 @@ export const DEFAULT_FEATURE_SETTINGS: FeatureSettings = {
     monthlyTokenLimit: 0, // 0 = no limit
     monthlyCostLimit: 0, // 0 = no limit (dollars)
     warningThreshold: 80, // Warn at 80% of budget
+  },
+  enforcement: {
+    squadChat: false,
+    reviewGate: false,
+    closingComments: false,
+    autoTelemetry: false,
+    autoTimeTracking: false,
   },
   hooks: {
     enabled: false, // Disabled by default

@@ -6,9 +6,12 @@ import { TaskIdSchema, TelemetryEventTypeSchema, optionalIsoDate } from './commo
  * Transforms "task.created,run.started" -> ['task.created', 'run.started']
  */
 const telemetryTypesParam = z.string().transform((val, ctx) => {
-  const types = val.split(',').map(t => t.trim()).filter(Boolean);
+  const types = val
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
   const validTypes: z.infer<typeof TelemetryEventTypeSchema>[] = [];
-  
+
   for (const type of types) {
     const result = TelemetryEventTypeSchema.safeParse(type);
     if (!result.success) {
@@ -20,7 +23,7 @@ const telemetryTypesParam = z.string().transform((val, ctx) => {
     }
     validTypes.push(result.data);
   }
-  
+
   return validTypes;
 });
 
@@ -70,6 +73,7 @@ export type TelemetryBulkQuery = z.infer<typeof TelemetryBulkQuerySchema>;
 const BaseEventSchema = z.object({
   taskId: z.string().min(1, 'taskId is required'),
   project: z.string().optional(),
+  timestamp: z.string().datetime().optional(), // Allow backdating for demo/historical data
 });
 
 /** run.started event payload */
