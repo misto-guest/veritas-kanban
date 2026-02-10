@@ -486,13 +486,17 @@ export class TaskService {
 
       const previousStatus = freshTask.status;
       const statusChanged = input.status !== undefined && input.status !== previousStatus;
+      let settings: Awaited<ReturnType<ConfigService['getFeatureSettings']>> | null = null;
+
+      if (statusChanged) {
+        const configService = new ConfigService();
+        settings = await configService.getFeatureSettings();
+      }
 
       // Validate transition hooks (quality gates) before allowing status change
-      if (statusChanged && input.status) {
+      if (statusChanged && input.status && settings) {
         // Check requireDeliverableForDone setting
         if (input.status === 'done') {
-          const configService = new ConfigService();
-          const settings = await configService.getFeatureSettings();
           if (settings.tasks.requireDeliverableForDone) {
             const deliverables = input.deliverables ?? freshTask.deliverables ?? [];
             if (deliverables.length === 0) {
@@ -510,7 +514,7 @@ export class TaskService {
           }
 
           // Enforcement: 4x10 Review Gate (only if enforcement settings are explicitly configured)
-          if (settings.enforcement && (settings.enforcement.reviewGate ?? true)) {
+          if (settings.enforcement?.reviewGate === true) {
             const scores = input.reviewScores ?? freshTask.reviewScores ?? [];
             const allPerfect = scores.length === 4 && scores.every((s: number) => s === 10);
             if (!allPerfect) {
@@ -528,7 +532,7 @@ export class TaskService {
           }
 
           // Enforcement: Closing Comments Required (only if enforcement settings are explicitly configured)
-          if (settings.enforcement && (settings.enforcement.closingComments ?? true)) {
+          if (settings.enforcement?.closingComments === true) {
             const comments = input.reviewComments ?? freshTask.reviewComments ?? [];
             const hasClosingComment =
               comments.length > 0 &&
@@ -617,12 +621,7 @@ export class TaskService {
         }
 
         // Enforcement: Auto-telemetry emission (run.started/run.completed)
-        // Fetch settings once for enforcement checks (only if enforcement is configured)
-        const enforcementConfigService = new ConfigService();
-        const enforcementSettings = await enforcementConfigService.getFeatureSettings();
-        const autoTelemetry = enforcementSettings.enforcement
-          ? (enforcementSettings.enforcement.autoTelemetry ?? true)
-          : false;
+        const autoTelemetry = settings?.enforcement?.autoTelemetry === true;
 
         if (autoTelemetry) {
           const agent = updatedTask.agent || 'veritas';
@@ -657,9 +656,7 @@ export class TaskService {
         }
 
         // Enforcement: Auto time tracking start/stop (only if enforcement is configured)
-        const autoTimeTracking = enforcementSettings.enforcement
-          ? (enforcementSettings.enforcement.autoTimeTracking ?? true)
-          : false;
+        const autoTimeTracking = settings?.enforcement?.autoTimeTracking === true;
         if (autoTimeTracking) {
           if (updatedTask.status === 'in-progress' && previousStatus !== 'in-progress') {
             // Auto-start timer

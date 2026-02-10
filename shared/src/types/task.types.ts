@@ -175,7 +175,7 @@ export interface Task {
   reviewComments?: ReviewComment[];
 
   // Review scores (4x10 gate)
-  reviewScores?: number[];
+  reviewScores?: [number, number, number, number];
 
   // Review state
   review?: ReviewState;
@@ -266,7 +266,7 @@ export interface CreateTaskInput {
   agents?: AgentType[]; // Multi-agent assignment
   subtasks?: Subtask[]; // Can be provided when creating from a template
   blockedBy?: string[]; // Can be provided when creating from a blueprint
-  reviewScores?: number[]; // Optional 4x10 scores
+  reviewScores?: [number, number, number, number]; // Optional 4x10 scores
   reviewComments?: ReviewComment[]; // Optional review comments
 }
 
@@ -284,7 +284,7 @@ export interface UpdateTaskInput {
   github?: TaskGitHub;
   attempt?: TaskAttempt;
   reviewComments?: ReviewComment[];
-  reviewScores?: number[];
+  reviewScores?: [number, number, number, number];
   review?: ReviewState;
   subtasks?: Subtask[];
   autoCompleteOnSubtasks?: boolean;

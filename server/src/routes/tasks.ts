@@ -33,7 +33,7 @@ const reviewCommentSchema = z.object({
   created: z.string(),
 });
 
-const reviewScoresSchema = z.array(z.number().int().min(0).max(10)).length(4);
+export const reviewScoresSchema = z.array(z.number().int().min(0).max(10)).length(4);
 
 const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
