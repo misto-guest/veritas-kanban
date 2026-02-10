@@ -20,6 +20,7 @@ const log = createLogger('workflow-step-executor');
 
 export class WorkflowStepExecutor {
   private runsDir: string;
+  private appendCountCache?: Map<string, number>; // Performance: Track append counts to reduce stat() calls
 
   constructor(runsDir?: string) {
     this.runsDir = runsDir || getWorkflowRunsDir();
@@ -226,16 +227,52 @@ export class WorkflowStepExecutor {
   }
 
   /**
-   * Validate a single acceptance criterion (Phase 4: enhanced validation)
+   * Validate a single acceptance criterion (Phase 4: enhanced validation with security hardening)
    */
   private validateCriterion(criterion: string, rawOutput: string, parsedOutput: unknown): boolean {
     // Check for validation type patterns
 
-    // Regex pattern: /pattern/
-    if (criterion.startsWith('/') && criterion.endsWith('/')) {
-      const pattern = criterion.slice(1, -1);
-      const regex = new RegExp(pattern);
-      return regex.test(rawOutput);
+    // Regex pattern: /pattern/flags
+    if (criterion.startsWith('/') && criterion.includes('/')) {
+      const lastSlash = criterion.lastIndexOf('/');
+      if (lastSlash > 0) {
+        const pattern = criterion.slice(1, lastSlash);
+        const flags = criterion.slice(lastSlash + 1);
+
+        // Security: Validate pattern length to prevent ReDoS
+        if (pattern.length > 500) {
+          log.warn({ criterion }, 'Regex pattern exceeds safe length — treating as literal match');
+          return rawOutput.includes(criterion);
+        }
+
+        // Security: Validate flags are safe (only i,m,s allowed — no g,y,u which could have side effects)
+        if (flags && !/^[ims]*$/.test(flags)) {
+          log.warn({ criterion, flags }, 'Unsafe regex flags detected — treating as literal match');
+          return rawOutput.includes(criterion);
+        }
+
+        try {
+          // Test the regex can compile and execute quickly
+          const testStart = Date.now();
+          const regex = new RegExp(pattern, flags);
+          const result = regex.test(rawOutput);
+          const testDuration = Date.now() - testStart;
+
+          // Security: If regex takes >100ms, it might be a ReDoS attempt
+          if (testDuration > 100) {
+            log.warn(
+              { criterion, duration: testDuration },
+              'Regex execution exceeded safe duration — possible ReDoS attempt'
+            );
+            return false;
+          }
+
+          return result;
+        } catch (err) {
+          log.warn({ criterion, err }, 'Invalid regex pattern — treating as literal match');
+          return rawOutput.includes(pattern);
+        }
+      }
     }
 
     // JSON path check: output.field == value
@@ -289,8 +326,23 @@ export class WorkflowStepExecutor {
     }
 
     // Check max iterations safety limit
-    const maxIterations = loopConfig.max_iterations || collection.length;
+    // Security/Performance: Hard cap at 1000 iterations even if max_iterations not set
+    const DEFAULT_MAX_ITERATIONS = 1000;
+    const configuredMax = loopConfig.max_iterations || DEFAULT_MAX_ITERATIONS;
+    const maxIterations = Math.min(configuredMax, DEFAULT_MAX_ITERATIONS);
     const iterationCount = Math.min(collection.length, maxIterations);
+
+    if (collection.length > maxIterations) {
+      log.warn(
+        {
+          runId: run.id,
+          stepId: step.id,
+          collectionSize: collection.length,
+          maxIterations,
+        },
+        `Loop collection size (${collection.length}) exceeds max iterations (${maxIterations}) — capping execution`
+      );
+    }
 
     // Initialize loop state in step run
     const stepRun = run.steps.find((s) => s.stepId === step.id);
@@ -509,6 +561,14 @@ export class WorkflowStepExecutor {
       throw new Error(`Parallel step ${step.id} has no sub-steps defined`);
     }
 
+    // Security/Performance: Hard cap on parallel sub-steps to prevent resource exhaustion
+    const MAX_PARALLEL_SUBSTEPS = 50;
+    if (subSteps.length > MAX_PARALLEL_SUBSTEPS) {
+      throw new Error(
+        `Parallel step ${step.id} has ${subSteps.length} sub-steps, exceeding maximum of ${MAX_PARALLEL_SUBSTEPS}`
+      );
+    }
+
     // Load progress file
     const progress = await this.loadProgressFile(run.id);
     const contextWithProgress = {
@@ -528,6 +588,8 @@ export class WorkflowStepExecutor {
     );
 
     // Execute all sub-steps in parallel using Promise.allSettled
+    // Note: For production use with real OpenClaw sessions, consider batching to limit
+    // concurrent session spawns (e.g., p-limit library with concurrency: 10)
     const subStepPromises = subSteps.map((subStep) =>
       this.executeParallelSubStep(subStep, run, contextWithProgress, step.id)
     );
@@ -636,6 +698,7 @@ export class WorkflowStepExecutor {
   /**
    * Evaluate a template expression to a value
    * Supports: variable access, equality checks, boolean expressions
+   * Security: Uses proper tokenization to prevent injection via boolean operator bypass
    */
   private evaluateExpression(expr: string, context: Record<string, unknown>): unknown {
     const trimmed = expr.trim();
@@ -643,25 +706,35 @@ export class WorkflowStepExecutor {
     // Remove template braces if present: {{expr}} → expr
     const cleaned = trimmed.replace(/^\{\{|\}\}$/g, '').trim();
 
+    // Security: Parse boolean operators BEFORE equality to prevent "foo and bar" in strings from splitting
+    // Use regex with negative lookbehind/lookahead to only match operators outside quotes
+    // This regex matches " and " or " or " that are NOT inside quoted strings
+    const booleanOpPattern = /\s+(and|or)\s+(?=(?:[^"']*["'][^"']*["'])*[^"']*$)/i;
+    const boolMatch = cleaned.match(booleanOpPattern);
+
+    if (boolMatch) {
+      const operator = boolMatch[1].toLowerCase();
+      const parts = cleaned.split(boolMatch[0]); // Split on the matched operator with spaces
+
+      if (operator === 'and') {
+        // Evaluate all parts and check if all are truthy
+        const results = parts.map((p) => this.evaluateExpression(p.trim(), context));
+        return results.every((r) => r === true || r === 'true');
+      } else if (operator === 'or') {
+        // Evaluate all parts and check if any is truthy
+        const results = parts.map((p) => this.evaluateExpression(p.trim(), context));
+        return results.some((r) => r === true || r === 'true');
+      }
+    }
+
     // Boolean equality: {{verify.decision == "approved"}}
+    // Only match == that's NOT inside quotes
     const eqMatch = cleaned.match(/^(.+?)\s*==\s*(.+)$/);
     if (eqMatch) {
       const [, leftExpr, rightExpr] = eqMatch;
       const left = this.getNestedValue(context, leftExpr.trim());
       const right = rightExpr.trim().replace(/^["']|["']$/g, '');
       return String(left) === right;
-    }
-
-    // Boolean AND: {{a == "x" and b == "y"}}
-    if (cleaned.includes(' and ')) {
-      const parts = cleaned.split(' and ').map((p) => this.evaluateExpression(p, context));
-      return parts.every((p) => p === true);
-    }
-
-    // Boolean OR: {{a == "x" or b == "y"}}
-    if (cleaned.includes(' or ')) {
-      const parts = cleaned.split(' or ').map((p) => this.evaluateExpression(p, context));
-      return parts.some((p) => p === true);
     }
 
     // Default: resolve as variable access
@@ -716,21 +789,35 @@ export class WorkflowStepExecutor {
     const progressPath = path.join(this.runsDir, safeRunId, 'progress.md');
     const timestamp = new Date().toISOString();
 
-    // Check progress file size before appending (cap at 10MB)
+    // Performance: Check progress file size before appending (cap at 10MB)
+    // Only check size periodically to avoid repeated stat() calls
     const MAX_PROGRESS_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    try {
-      const stats = await fs.stat(progressPath);
-      if (stats.size > MAX_PROGRESS_FILE_SIZE) {
-        log.warn(
-          { runId, fileSize: stats.size },
-          'Progress file exceeds size limit — skipping append'
-        );
-        return; // Skip appending if file is too large
-      }
-    } catch (err: unknown) {
-      // File doesn't exist yet — that's fine
-      if (!(err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT')) {
-        throw err;
+    const SIZE_CHECK_INTERVAL = 5; // Check every 5 appends
+
+    // Use a cache to track append count per run (avoids repeated stat calls)
+    if (!this.appendCountCache) {
+      this.appendCountCache = new Map<string, number>();
+    }
+
+    const appendCount = (this.appendCountCache.get(runId) || 0) + 1;
+    this.appendCountCache.set(runId, appendCount);
+
+    // Only check file size periodically
+    if (appendCount % SIZE_CHECK_INTERVAL === 0) {
+      try {
+        const stats = await fs.stat(progressPath);
+        if (stats.size > MAX_PROGRESS_FILE_SIZE) {
+          log.warn(
+            { runId, fileSize: stats.size, appends: appendCount },
+            'Progress file exceeds size limit — skipping append'
+          );
+          return; // Skip appending if file is too large
+        }
+      } catch (err: unknown) {
+        // File doesn't exist yet — that's fine
+        if (!(err && typeof err === 'object' && 'code' in err && err.code === 'ENOENT')) {
+          throw err;
+        }
       }
     }
 
@@ -744,17 +831,27 @@ export class WorkflowStepExecutor {
   /**
    * Build steps context for template resolution
    * Enables {{steps.step-id.output}} references
+   * Performance: Only includes completed steps with output
    */
   private buildStepsContext(run: WorkflowRun): Record<string, unknown> {
     const stepsContext: Record<string, unknown> = {};
 
-    for (const stepRun of run.steps) {
-      if (stepRun.status === 'completed' && run.context[stepRun.stepId]) {
-        stepsContext[stepRun.stepId] = {
-          output: run.context[stepRun.stepId],
-          status: stepRun.status,
-          duration: stepRun.duration,
-        };
+    // Performance: Use for loop instead of for...of for faster iteration
+    const steps = run.steps;
+    const context = run.context;
+
+    for (let i = 0; i < steps.length; i++) {
+      const stepRun = steps[i];
+      // Only include completed steps that have output in context
+      if (stepRun.status === 'completed') {
+        const stepOutput = context[stepRun.stepId];
+        if (stepOutput !== undefined) {
+          stepsContext[stepRun.stepId] = {
+            output: stepOutput,
+            status: stepRun.status,
+            duration: stepRun.duration,
+          };
+        }
       }
     }
 

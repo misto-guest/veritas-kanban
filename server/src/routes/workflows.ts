@@ -353,6 +353,19 @@ router.post(
       );
     }
 
+    // Security: Verify this is actually a gate step
+    const workflow = await workflowService.loadWorkflow(run.workflowId);
+    if (!workflow) {
+      throw new NotFoundError(`Workflow ${run.workflowId} not found`);
+    }
+
+    const stepDef = workflow.steps.find((s) => s.id === stepId);
+    if (!stepDef || stepDef.type !== 'gate') {
+      throw new ValidationError(
+        `Step ${stepId} is not a gate step (type: ${stepDef?.type || 'unknown'})`
+      );
+    }
+
     // Approve: add approval to context and resume
     const approvalContext = {
       ...run.context,
@@ -398,6 +411,19 @@ router.post(
     if (stepRun.status !== 'failed') {
       throw new ValidationError(
         `Step ${stepId} is not awaiting approval (current status: ${stepRun.status})`
+      );
+    }
+
+    // Security: Verify this is actually a gate step
+    const workflow = await workflowService.loadWorkflow(run.workflowId);
+    if (!workflow) {
+      throw new NotFoundError(`Workflow ${run.workflowId} not found`);
+    }
+
+    const stepDef = workflow.steps.find((s) => s.id === stepId);
+    if (!stepDef || stepDef.type !== 'gate') {
+      throw new ValidationError(
+        `Step ${stepId} is not a gate step (type: ${stepDef?.type || 'unknown'})`
       );
     }
 
