@@ -82,7 +82,10 @@ router.get(
  */
 router.get(
   '/:id',
-  asyncHandler(async (req: AuthenticatedRequest, res) => {
+  asyncHandler(async (req: AuthenticatedRequest, res, next) => {
+    // Skip if this is a /runs/* sub-route (Express matches /:id before /runs/*)
+    if (req.params.id === 'runs') return next();
+
     const workflowId = getStringParam(req.params.id);
     const userId = getUserId(req);
 
