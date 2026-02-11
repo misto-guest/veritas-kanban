@@ -5,8 +5,8 @@ import jwt from 'jsonwebtoken';
 // We need to mock the filesystem and env before importing the module
 const mockFs: Record<string, string> = {};
 
-vi.mock('fs', () => ({
-  default: {
+vi.mock('fs', () => {
+  const impl = {
     existsSync: (path: string) => path in mockFs,
     readFileSync: (path: string) => {
       if (path in mockFs) return mockFs[path];
@@ -20,8 +20,9 @@ vi.mock('fs', () => ({
       delete mockFs[from];
     },
     mkdirSync: () => {},
-  },
-}));
+  };
+  return { ...impl, default: impl };
+});
 
 // Import after mocks are set up
 import {
@@ -69,7 +70,12 @@ describe('JWT Secret Rotation', () => {
     it('should return latest secret from jwtSecrets array', () => {
       setConfig({
         jwtSecrets: [
-          { secret: 'old-secret', version: 1, createdAt: '2026-01-01T00:00:00Z', expiresAt: '2026-02-01T00:00:00Z' },
+          {
+            secret: 'old-secret',
+            version: 1,
+            createdAt: '2026-01-01T00:00:00Z',
+            expiresAt: '2026-02-01T00:00:00Z',
+          },
           { secret: 'current-secret', version: 2, createdAt: '2026-01-15T00:00:00Z' },
         ],
         jwtSecretVersion: 2,
@@ -93,7 +99,12 @@ describe('JWT Secret Rotation', () => {
       const futureDate = new Date(Date.now() + 86400000).toISOString(); // +1 day
       setConfig({
         jwtSecrets: [
-          { secret: 'old-secret', version: 1, createdAt: '2026-01-01T00:00:00Z', expiresAt: futureDate },
+          {
+            secret: 'old-secret',
+            version: 1,
+            createdAt: '2026-01-01T00:00:00Z',
+            expiresAt: futureDate,
+          },
           { secret: 'current-secret', version: 2, createdAt: '2026-01-15T00:00:00Z' },
         ],
         jwtSecretVersion: 2,
@@ -109,7 +120,12 @@ describe('JWT Secret Rotation', () => {
       const pastDate = new Date(Date.now() - 86400000).toISOString(); // -1 day
       setConfig({
         jwtSecrets: [
-          { secret: 'expired-secret', version: 1, createdAt: '2026-01-01T00:00:00Z', expiresAt: pastDate },
+          {
+            secret: 'expired-secret',
+            version: 1,
+            createdAt: '2026-01-01T00:00:00Z',
+            expiresAt: pastDate,
+          },
           { secret: 'current-secret', version: 2, createdAt: '2026-01-15T00:00:00Z' },
         ],
         jwtSecretVersion: 2,
@@ -143,11 +159,11 @@ describe('JWT Secret Rotation', () => {
       const config = getSecurityConfig();
       expect(config.jwtSecrets).toHaveLength(2);
       // Legacy secret should have an expiresAt
-      const legacyEntry = config.jwtSecrets!.find(s => s.secret === 'legacy-secret');
+      const legacyEntry = config.jwtSecrets!.find((s) => s.secret === 'legacy-secret');
       expect(legacyEntry).toBeDefined();
       expect(legacyEntry!.expiresAt).toBeDefined();
       // New secret should NOT have expiresAt
-      const newEntry = config.jwtSecrets!.find(s => s.version === 2);
+      const newEntry = config.jwtSecrets!.find((s) => s.version === 2);
       expect(newEntry).toBeDefined();
       expect(newEntry!.expiresAt).toBeUndefined();
     });
@@ -155,9 +171,7 @@ describe('JWT Secret Rotation', () => {
     it('should rotate existing array', () => {
       const secret1 = crypto.randomBytes(32).toString('hex');
       setConfig({
-        jwtSecrets: [
-          { secret: secret1, version: 1, createdAt: '2026-01-01T00:00:00Z' },
-        ],
+        jwtSecrets: [{ secret: secret1, version: 1, createdAt: '2026-01-01T00:00:00Z' }],
         jwtSecretVersion: 1,
       });
 
@@ -168,7 +182,7 @@ describe('JWT Secret Rotation', () => {
       const config = getSecurityConfig();
       expect(config.jwtSecrets).toHaveLength(2);
       // Old secret should have expiresAt
-      const oldEntry = config.jwtSecrets!.find(s => s.version === 1);
+      const oldEntry = config.jwtSecrets!.find((s) => s.version === 1);
       expect(oldEntry!.expiresAt).toBeDefined();
     });
 
@@ -192,15 +206,13 @@ describe('JWT Secret Rotation', () => {
       const config = getSecurityConfig();
       // Should have version 2 (with expiresAt) and version 3 (current)
       expect(config.jwtSecrets).toHaveLength(2);
-      expect(config.jwtSecrets!.find(s => s.version === 1)).toBeUndefined();
+      expect(config.jwtSecrets!.find((s) => s.version === 1)).toBeUndefined();
     });
 
     it('should support custom grace period (short)', () => {
       const secret1 = crypto.randomBytes(32).toString('hex');
       setConfig({
-        jwtSecrets: [
-          { secret: secret1, version: 1, createdAt: '2026-01-01T00:00:00Z' },
-        ],
+        jwtSecrets: [{ secret: secret1, version: 1, createdAt: '2026-01-01T00:00:00Z' }],
         jwtSecretVersion: 1,
       });
 
@@ -210,7 +222,7 @@ describe('JWT Secret Rotation', () => {
       expect(result.success).toBe(true);
 
       const config = getSecurityConfig();
-      const oldEntry = config.jwtSecrets!.find(s => s.version === 1);
+      const oldEntry = config.jwtSecrets!.find((s) => s.version === 1);
       expect(oldEntry).toBeDefined();
       expect(oldEntry!.expiresAt).toBeDefined();
       // expiresAt should be approximately 1 hour from now
@@ -222,9 +234,7 @@ describe('JWT Secret Rotation', () => {
     it('should immediately prune with 0ms grace period', () => {
       const secret1 = crypto.randomBytes(32).toString('hex');
       setConfig({
-        jwtSecrets: [
-          { secret: secret1, version: 1, createdAt: '2026-01-01T00:00:00Z' },
-        ],
+        jwtSecrets: [{ secret: secret1, version: 1, createdAt: '2026-01-01T00:00:00Z' }],
         jwtSecretVersion: 1,
       });
 
@@ -272,9 +282,7 @@ describe('JWT Secret Rotation', () => {
       // Set up initial secret
       const initialSecret = crypto.randomBytes(32).toString('hex');
       setConfig({
-        jwtSecrets: [
-          { secret: initialSecret, version: 1, createdAt: '2026-01-01T00:00:00Z' },
-        ],
+        jwtSecrets: [{ secret: initialSecret, version: 1, createdAt: '2026-01-01T00:00:00Z' }],
         jwtSecretVersion: 1,
       });
 
@@ -305,7 +313,12 @@ describe('JWT Secret Rotation', () => {
     it('should sign new tokens with current (latest) secret', () => {
       setConfig({
         jwtSecrets: [
-          { secret: 'old-secret', version: 1, createdAt: '2026-01-01T00:00:00Z', expiresAt: new Date(Date.now() + 86400000).toISOString() },
+          {
+            secret: 'old-secret',
+            version: 1,
+            createdAt: '2026-01-01T00:00:00Z',
+            expiresAt: new Date(Date.now() + 86400000).toISOString(),
+          },
           { secret: 'new-secret', version: 2, createdAt: '2026-01-15T00:00:00Z' },
         ],
         jwtSecretVersion: 2,
