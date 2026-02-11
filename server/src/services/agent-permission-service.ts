@@ -13,7 +13,11 @@
 import { createLogger } from '../lib/logger.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
+import { getRuntimeDir } from '../utils/paths.js';
+import { migrateLegacyFiles } from '../utils/migrate-legacy-files.js';
+const DATA_DIR = getRuntimeDir();
+const LEGACY_DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
+let migrationChecked = false;
 
 const log = createLogger('agent-permissions');
 
@@ -59,7 +63,10 @@ export interface ApprovalRequest {
 
 // ─── Default Permissions ─────────────────────────────────────────
 
-const DEFAULT_PERMISSIONS: Record<PermissionLevel, Omit<AgentPermissionConfig, 'agentId' | 'updatedAt'>> = {
+const DEFAULT_PERMISSIONS: Record<
+  PermissionLevel,
+  Omit<AgentPermissionConfig, 'agentId' | 'updatedAt'>
+> = {
   intern: {
     level: 'intern',
     canCreateTasks: false,
@@ -99,6 +106,16 @@ class AgentPermissionService {
   }
 
   private async ensureLoaded(): Promise<void> {
+    if (!migrationChecked) {
+      migrationChecked = true;
+      await migrateLegacyFiles(
+        LEGACY_DATA_DIR,
+        DATA_DIR,
+        ['agent-permissions.json', 'approval-requests.json'],
+        'agent permission'
+      );
+    }
+
     if (this.loaded) return;
     try {
       const data = await fs.readFile(this.permissionsPath, 'utf-8');
@@ -169,7 +186,17 @@ class AgentPermissionService {
    */
   async updatePermissions(
     agentId: string,
-    update: Partial<Pick<AgentPermissionConfig, 'trustedDomains' | 'canCreateTasks' | 'canDelegate' | 'canApprove' | 'autoComplete' | 'restrictions'>>
+    update: Partial<
+      Pick<
+        AgentPermissionConfig,
+        | 'trustedDomains'
+        | 'canCreateTasks'
+        | 'canDelegate'
+        | 'canApprove'
+        | 'autoComplete'
+        | 'restrictions'
+      >
+    >
   ): Promise<AgentPermissionConfig> {
     await this.ensureLoaded();
 
@@ -196,7 +223,10 @@ class AgentPermissionService {
   /**
    * Check if an agent can perform an action.
    */
-  async checkPermission(agentId: string, action: string): Promise<{
+  async checkPermission(
+    agentId: string,
+    action: string
+  ): Promise<{
     allowed: boolean;
     reason?: string;
     requiresApproval?: boolean;
@@ -267,7 +297,10 @@ class AgentPermissionService {
     this.approvals.push(request);
     await this.saveApprovals();
 
-    log.info({ requestId: request.id, agentId: params.agentId, action: params.action }, 'Approval requested');
+    log.info(
+      { requestId: request.id, agentId: params.agentId, action: params.action },
+      'Approval requested'
+    );
     return request;
   }
 
@@ -303,7 +336,9 @@ class AgentPermissionService {
     if (filters?.agentId) {
       results = results.filter((a) => a.agentId === filters.agentId!.toLowerCase());
     }
-    return results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return results.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }
 }
 

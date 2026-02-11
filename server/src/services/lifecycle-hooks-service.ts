@@ -17,7 +17,11 @@
 import { createLogger } from '../lib/logger.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
+import { getRuntimeDir } from '../utils/paths.js';
+import { migrateLegacyFiles } from '../utils/migrate-legacy-files.js';
+const DATA_DIR = getRuntimeDir();
+const LEGACY_DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), '..', '.veritas-kanban');
+let migrationChecked = false;
 
 const log = createLogger('lifecycle-hooks');
 
@@ -34,15 +38,15 @@ export type LifecycleEvent =
   | 'task.reviewed';
 
 export type HookAction =
-  | 'notify'              // Send notification
-  | 'log_activity'        // Log to activity feed
-  | 'start_time'          // Start time tracking
-  | 'stop_time'           // Stop time tracking
-  | 'verify_checklist'    // Run verification checklist
-  | 'request_context'     // Ask for blocked reason/context
-  | 'emit_telemetry'      // Emit telemetry event
-  | 'webhook'             // Call external webhook URL
-  | 'custom';             // Custom action (for extensibility)
+  | 'notify' // Send notification
+  | 'log_activity' // Log to activity feed
+  | 'start_time' // Start time tracking
+  | 'stop_time' // Stop time tracking
+  | 'verify_checklist' // Run verification checklist
+  | 'request_context' // Ask for blocked reason/context
+  | 'emit_telemetry' // Emit telemetry event
+  | 'webhook' // Call external webhook URL
+  | 'custom'; // Custom action (for extensibility)
 
 export interface HookConfig {
   id: string;
@@ -163,7 +167,10 @@ class LifecycleHooksService {
   private loaded = false;
 
   // Hook handlers — extensible
-  private handlers = new Map<HookAction, (hook: HookConfig, context: HookContext) => Promise<void>>();
+  private handlers = new Map<
+    HookAction,
+    (hook: HookConfig, context: HookContext) => Promise<void>
+  >();
 
   constructor() {
     // Register built-in handlers
@@ -213,6 +220,16 @@ class LifecycleHooksService {
   }
 
   private async ensureLoaded(): Promise<void> {
+    if (!migrationChecked) {
+      migrationChecked = true;
+      await migrateLegacyFiles(
+        LEGACY_DATA_DIR,
+        DATA_DIR,
+        ['lifecycle-hooks.json', 'hook-executions.json'],
+        'lifecycle hook'
+      );
+    }
+
     if (this.loaded) return;
 
     try {
@@ -261,9 +278,24 @@ class LifecycleHooksService {
     const matchingHooks = this.hooks
       .filter((h) => h.enabled && h.event === event)
       .filter((h) => {
-        if (h.taskTypeFilter?.length && context.taskType && !h.taskTypeFilter.includes(context.taskType)) return false;
-        if (h.projectFilter?.length && context.project && !h.projectFilter.includes(context.project)) return false;
-        if (h.priorityFilter?.length && context.priority && !h.priorityFilter.includes(context.priority)) return false;
+        if (
+          h.taskTypeFilter?.length &&
+          context.taskType &&
+          !h.taskTypeFilter.includes(context.taskType)
+        )
+          return false;
+        if (
+          h.projectFilter?.length &&
+          context.project &&
+          !h.projectFilter.includes(context.project)
+        )
+          return false;
+        if (
+          h.priorityFilter?.length &&
+          context.priority &&
+          !h.priorityFilter.includes(context.priority)
+        )
+          return false;
         return true;
       })
       .sort((a, b) => a.order - b.order);
@@ -303,7 +335,10 @@ class LifecycleHooksService {
 
     if (results.length > 0) {
       await this.saveExecutions();
-      log.info({ event, taskId: context.taskId, hooksRun: results.length }, 'Lifecycle event fired');
+      log.info(
+        { event, taskId: context.taskId, hooksRun: results.length },
+        'Lifecycle event fired'
+      );
     }
 
     return results;
@@ -312,7 +347,10 @@ class LifecycleHooksService {
   /**
    * List all configured hooks.
    */
-  async listHooks(options?: { event?: LifecycleEvent; enabledOnly?: boolean }): Promise<HookConfig[]> {
+  async listHooks(options?: {
+    event?: LifecycleEvent;
+    enabledOnly?: boolean;
+  }): Promise<HookConfig[]> {
     await this.ensureLoaded();
 
     let results = [...this.hooks];
@@ -362,7 +400,21 @@ class LifecycleHooksService {
   /**
    * Update a hook.
    */
-  async updateHook(id: string, update: Partial<Pick<HookConfig, 'name' | 'enabled' | 'taskTypeFilter' | 'projectFilter' | 'priorityFilter' | 'config' | 'order'>>): Promise<HookConfig | null> {
+  async updateHook(
+    id: string,
+    update: Partial<
+      Pick<
+        HookConfig,
+        | 'name'
+        | 'enabled'
+        | 'taskTypeFilter'
+        | 'projectFilter'
+        | 'priorityFilter'
+        | 'config'
+        | 'order'
+      >
+    >
+  ): Promise<HookConfig | null> {
     await this.ensureLoaded();
 
     const hook = this.hooks.find((h) => h.id === id);
@@ -397,7 +449,11 @@ class LifecycleHooksService {
   /**
    * Get recent hook executions.
    */
-  async getExecutions(filters?: { hookId?: string; taskId?: string; limit?: number }): Promise<HookExecution[]> {
+  async getExecutions(filters?: {
+    hookId?: string;
+    taskId?: string;
+    limit?: number;
+  }): Promise<HookExecution[]> {
     await this.ensureLoaded();
 
     let results = [...this.executions];
@@ -413,7 +469,10 @@ class LifecycleHooksService {
   /**
    * Register a custom handler for an action type.
    */
-  registerHandler(action: HookAction, handler: (hook: HookConfig, context: HookContext) => Promise<void>): void {
+  registerHandler(
+    action: HookAction,
+    handler: (hook: HookConfig, context: HookContext) => Promise<void>
+  ): void {
     this.handlers.set(action, handler);
   }
 }
