@@ -374,24 +374,9 @@ const SystemMessageDivider = React.memo(function SystemMessageDivider({
     }
   };
 
-  // Determine color scheme based on event type
-  const getColorScheme = () => {
-    switch (message.event) {
-      case 'agent.spawned':
-        return 'bg-blue-500/10 border-blue-500/30 text-blue-300';
-      case 'agent.completed':
-        return 'bg-green-500/10 border-green-500/30 text-green-300';
-      case 'agent.failed':
-        return 'bg-red-500/10 border-red-500/30 text-red-300';
-      case 'agent.status':
-        return 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300';
-      default:
-        return 'bg-gray-500/10 border-gray-500/30 text-gray-300';
-    }
-  };
-
+  // All system messages use consistent gray/muted styling
   return (
-    <div className={`rounded-lg border p-3 ${getColorScheme()}`}>
+    <div className="rounded-lg border border-border p-3 bg-muted/50 text-muted-foreground">
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-2">
           <span className="text-base">{getEventIcon()}</span>
