@@ -32,18 +32,20 @@ export function EnforcementTab() {
       <div className="space-y-4 mt-6">
         <h3 className="text-sm font-medium text-foreground">Quality Gates</h3>
         <div className="divide-y">
-          <div>
-            <ToggleRow
-              label="Review Gate"
-              description="Require 4x10 review scores before task completion"
-              checked={enforcement.reviewGate || false}
-              onCheckedChange={(v) => updateEnforcement('reviewGate', v)}
-            />
-            <p className="text-xs text-muted-foreground mt-1 ml-12 -mb-2">
-              Applies to code task types only (code, bug, feature, automation, system). Non-code
-              tasks can be completed without review scores.
-            </p>
-          </div>
+          <ToggleRow
+            label="Review Gate"
+            description="Require 4x10 review scores before task completion"
+            checked={enforcement.reviewGate || false}
+            onCheckedChange={(v) => updateEnforcement('reviewGate', v)}
+          />
+          {enforcement.reviewGate && (
+            <div className="px-3 pb-3 -mt-2">
+              <p className="text-xs text-muted-foreground bg-muted rounded-md px-3 py-2">
+                ⚠️ Applies to code task types only (code, bug, feature, automation, system).
+                Non-code tasks can be completed without review scores.
+              </p>
+            </div>
+          )}
           <ToggleRow
             label="Closing Comments"
             description="Require deliverable summary before task completion"
