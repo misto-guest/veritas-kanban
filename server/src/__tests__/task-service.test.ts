@@ -16,10 +16,10 @@ describe('TaskService', () => {
     testRoot = path.join(os.tmpdir(), `veritas-test-tasks-${uniqueSuffix}`);
     tasksDir = path.join(testRoot, 'active');
     archiveDir = path.join(testRoot, 'archive');
-    
+
     await fs.mkdir(tasksDir, { recursive: true });
     await fs.mkdir(archiveDir, { recursive: true });
-    
+
     service = new TaskService({
       tasksDir,
       archiveDir,
@@ -89,7 +89,7 @@ Code task with git info.
 
       const tasks = await service.listTasks();
       const task = tasks[0];
-      
+
       expect(task.git).toBeDefined();
       expect(task.git?.repo).toBe('my-repo');
       expect(task.git?.branch).toBe('feature/test');
@@ -121,11 +121,14 @@ attempts:
 ---
 Task with agent attempt.
 `;
-      await fs.writeFile(path.join(tasksDir, 'task_20260126_attempt123-agent-task.md'), taskContent);
+      await fs.writeFile(
+        path.join(tasksDir, 'task_20260126_attempt123-agent-task.md'),
+        taskContent
+      );
 
       const tasks = await service.listTasks();
       const task = tasks[0];
-      
+
       expect(task.attempt).toBeDefined();
       expect(task.attempt?.agent).toBe('claude-code');
       expect(task.attempt?.status).toBe('complete');
@@ -178,7 +181,7 @@ updated: '2026-01-26T10:00:00.000Z'
 
       // Verify file was created
       const files = await fs.readdir(tasksDir);
-      expect(files.some(f => f.includes('new-task'))).toBe(true);
+      expect(files.some((f) => f.includes('new-task'))).toBe(true);
     });
 
     it('should create a task with minimal fields', async () => {
@@ -198,7 +201,7 @@ updated: '2026-01-26T10:00:00.000Z'
       });
 
       const files = await fs.readdir(tasksDir);
-      const taskFile = files.find(f => f.includes(task.id));
+      const taskFile = files.find((f) => f.includes(task.id));
       expect(taskFile).toMatch(/test-special-characters-more/);
     });
   });
@@ -206,10 +209,10 @@ updated: '2026-01-26T10:00:00.000Z'
   describe('Task updates', () => {
     it('should update task fields', async () => {
       const task = await service.createTask({ title: 'Original' });
-      
+
       // Small delay to ensure different timestamp
-      await new Promise(r => setTimeout(r, 10));
-      
+      await new Promise((r) => setTimeout(r, 10));
+
       const updated = await service.updateTask(task.id, {
         title: 'Updated Title',
         status: 'in-progress',
@@ -219,7 +222,9 @@ updated: '2026-01-26T10:00:00.000Z'
       expect(updated?.title).toBe('Updated Title');
       expect(updated?.status).toBe('in-progress');
       expect(updated?.priority).toBe('high');
-      expect(new Date(updated!.updated).getTime()).toBeGreaterThanOrEqual(new Date(task.updated).getTime());
+      expect(new Date(updated!.updated).getTime()).toBeGreaterThanOrEqual(
+        new Date(task.updated).getTime()
+      );
     });
 
     it('should return null for non-existent task', async () => {
@@ -230,20 +235,20 @@ updated: '2026-01-26T10:00:00.000Z'
     it('should rename file when title changes', async () => {
       const task = await service.createTask({ title: 'Original Name' });
       const originalFiles = await fs.readdir(tasksDir);
-      
+
       await service.updateTask(task.id, { title: 'New Name' });
       const newFiles = await fs.readdir(tasksDir);
 
-      expect(originalFiles.some(f => f.includes('original-name'))).toBe(true);
-      expect(newFiles.some(f => f.includes('new-name'))).toBe(true);
-      expect(newFiles.some(f => f.includes('original-name'))).toBe(false);
+      expect(originalFiles.some((f) => f.includes('original-name'))).toBe(true);
+      expect(newFiles.some((f) => f.includes('new-name'))).toBe(true);
+      expect(newFiles.some((f) => f.includes('original-name'))).toBe(false);
     });
   });
 
   describe('Task deletion', () => {
     it('should delete a task', async () => {
       const task = await service.createTask({ title: 'To Delete' });
-      
+
       const result = await service.deleteTask(task.id);
       expect(result).toBe(true);
 
@@ -260,7 +265,7 @@ updated: '2026-01-26T10:00:00.000Z'
   describe('Task archival', () => {
     it('should move task to archive', async () => {
       const task = await service.createTask({ title: 'To Archive' });
-      
+
       const result = await service.archiveTask(task.id);
       expect(result).toBe(true);
 
@@ -270,12 +275,78 @@ updated: '2026-01-26T10:00:00.000Z'
 
       // Task should be in archive
       const archiveFiles = await fs.readdir(archiveDir);
-      expect(archiveFiles.some(f => f.includes('to-archive'))).toBe(true);
+      expect(archiveFiles.some((f) => f.includes('to-archive'))).toBe(true);
     });
 
     it('should return false for non-existent task', async () => {
       const result = await service.archiveTask('nonexistent');
       expect(result).toBe(false);
+    });
+
+    it('should cleanup all orphaned files when archiving tasks with title changes', async () => {
+      // Create a task
+      const task = await service.createTask({ title: 'Original Title' });
+      const originalFilename = `${task.id}-original-title.md`;
+
+      // Verify initial file exists
+      let activeFiles = await fs.readdir(tasksDir);
+      expect(activeFiles).toContain(originalFilename);
+
+      // Change title twice, creating orphaned files
+      await service.updateTask(task.id, { title: 'Updated Title' });
+      await service.updateTask(task.id, { title: 'Final Title' });
+
+      // Manually create orphaned files to simulate stale slugs
+      const orphanedFile1 = path.join(tasksDir, `${task.id}-updated-title.md`);
+      await fs.copyFile(path.join(tasksDir, `${task.id}-final-title.md`), orphanedFile1);
+
+      // Verify we have multiple files for the same task
+      activeFiles = await fs.readdir(tasksDir);
+      const taskFiles = activeFiles.filter((f) => f.startsWith(`${task.id}-`));
+      expect(taskFiles.length).toBeGreaterThan(1);
+
+      // Archive the task
+      const result = await service.archiveTask(task.id);
+      expect(result).toBe(true);
+
+      // Verify ALL files for this task are removed from active
+      activeFiles = await fs.readdir(tasksDir);
+      const remainingTaskFiles = activeFiles.filter((f) => f.startsWith(`${task.id}-`));
+      expect(remainingTaskFiles.length).toBe(0);
+
+      // Verify ALL files were moved to archive
+      const archiveFiles = await fs.readdir(archiveDir);
+      const archivedTaskFiles = archiveFiles.filter((f) => f.startsWith(`${task.id}-`));
+      expect(archivedTaskFiles.length).toBeGreaterThan(1);
+    });
+  });
+
+  describe('Task deletion with orphaned files', () => {
+    it('should cleanup all orphaned files when deleting tasks with title changes', async () => {
+      // Create a task
+      const task = await service.createTask({ title: 'Original Title' });
+
+      // Change title twice
+      await service.updateTask(task.id, { title: 'Updated Title' });
+      await service.updateTask(task.id, { title: 'Final Title' });
+
+      // Manually create orphaned files to simulate stale slugs
+      const orphanedFile1 = path.join(tasksDir, `${task.id}-updated-title.md`);
+      await fs.copyFile(path.join(tasksDir, `${task.id}-final-title.md`), orphanedFile1);
+
+      // Verify we have multiple files for the same task
+      let activeFiles = await fs.readdir(tasksDir);
+      const taskFiles = activeFiles.filter((f) => f.startsWith(`${task.id}-`));
+      expect(taskFiles.length).toBeGreaterThan(1);
+
+      // Delete the task
+      const result = await service.deleteTask(task.id);
+      expect(result).toBe(true);
+
+      // Verify ALL files for this task are removed
+      activeFiles = await fs.readdir(tasksDir);
+      const remainingTaskFiles = activeFiles.filter((f) => f.startsWith(`${task.id}-`));
+      expect(remainingTaskFiles.length).toBe(0);
     });
   });
 });

@@ -6,6 +6,8 @@ export function DocFreshnessTab() {
   const { settings } = useFeatureSettings();
   const { debouncedUpdate, isPending } = useDebouncedFeatureUpdate();
 
+  const docFreshness = settings.docFreshness || DEFAULT_FEATURE_SETTINGS.docFreshness;
+
   const update = (key: string, value: boolean | number) => {
     debouncedUpdate({ docFreshness: { ...docFreshness, [key]: value } });
   };
@@ -13,8 +15,6 @@ export function DocFreshnessTab() {
   const resetDocFreshness = () => {
     debouncedUpdate({ docFreshness: DEFAULT_FEATURE_SETTINGS.docFreshness });
   };
-
-  const docFreshness = settings.docFreshness || DEFAULT_FEATURE_SETTINGS.docFreshness;
 
   return (
     <div className="space-y-4">

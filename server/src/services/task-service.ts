@@ -36,6 +36,11 @@ const log = createLogger('task-cache');
  */
 const TASK_ID_REGEX = /^task_(\d{8}_[a-zA-Z0-9_-]{1,20}|[a-zA-Z0-9_-]+)$/;
 
+/**
+ * Task types that require 4x10 review gate (when enforcement is enabled)
+ */
+const CODE_TASK_TYPES = ['code', 'bug', 'feature', 'automation', 'system'];
+
 /** Validate task ID format */
 function isValidTaskId(id: string): boolean {
   return TASK_ID_REGEX.test(id);
@@ -527,10 +532,9 @@ export class TaskService {
 
           // Enforcement: 4x10 Review Gate (only if enforcement settings are explicitly configured)
           // Only applies to code-related task types
-          const CODE_TASK_TYPES = ['code', 'bug', 'feature', 'automation', 'system'];
           if (
             settings.enforcement?.reviewGate === true &&
-            CODE_TASK_TYPES.includes(freshTask.type)
+            CODE_TASK_TYPES.includes(freshTask.type?.toLowerCase())
           ) {
             const scores = input.reviewScores ?? freshTask.reviewScores ?? [];
             const allPerfect = scores.length === 4 && scores.every((s: number) => s === 10);

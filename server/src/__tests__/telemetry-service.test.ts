@@ -3,7 +3,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { TelemetryService } from '../services/telemetry-service.js';
-import type { TaskTelemetryEvent, RunTelemetryEvent, TokenTelemetryEvent } from '@veritas-kanban/shared';
+import type {
+  TaskTelemetryEvent,
+  RunTelemetryEvent,
+  TokenTelemetryEvent,
+} from '@veritas-kanban/shared';
 
 describe('TelemetryService', () => {
   let service: TelemetryService;
@@ -13,7 +17,7 @@ describe('TelemetryService', () => {
     // Create a temp directory for tests
     testDir = path.join(os.tmpdir(), `telemetry-test-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
-    
+
     service = new TelemetryService({
       telemetryDir: testDir,
       config: { enabled: true, retention: 7 },
@@ -81,7 +85,7 @@ describe('TelemetryService', () => {
       });
 
       const files = await fs.readdir(testDir);
-      const eventFiles = files.filter(f => f.startsWith('events-'));
+      const eventFiles = files.filter((f) => f.startsWith('events-'));
       expect(eventFiles.length).toBe(1);
 
       const today = new Date().toISOString().slice(0, 10);
@@ -99,7 +103,7 @@ describe('TelemetryService', () => {
       expect(event.id).toMatch(/^disabled_/);
 
       const files = await fs.readdir(testDir);
-      const eventFiles = files.filter(f => f.startsWith('events-'));
+      const eventFiles = files.filter((f) => f.startsWith('events-'));
       expect(eventFiles.length).toBe(0);
     });
   });
@@ -116,7 +120,11 @@ describe('TelemetryService', () => {
 
     it('should filter by type', async () => {
       await service.emit<TaskTelemetryEvent>({ type: 'task.created', taskId: 'task_1' });
-      await service.emit<TaskTelemetryEvent>({ type: 'task.status_changed', taskId: 'task_1', status: 'in-progress' });
+      await service.emit<TaskTelemetryEvent>({
+        type: 'task.status_changed',
+        taskId: 'task_1',
+        status: 'in-progress',
+      });
       await service.emit<TaskTelemetryEvent>({ type: 'task.archived', taskId: 'task_1' });
 
       const events = await service.getEvents({ type: 'task.created' });
@@ -143,8 +151,16 @@ describe('TelemetryService', () => {
     });
 
     it('should filter by project', async () => {
-      await service.emit<TaskTelemetryEvent>({ type: 'task.created', taskId: 'task_1', project: 'projectA' });
-      await service.emit<TaskTelemetryEvent>({ type: 'task.created', taskId: 'task_2', project: 'projectB' });
+      await service.emit<TaskTelemetryEvent>({
+        type: 'task.created',
+        taskId: 'task_1',
+        project: 'projectA',
+      });
+      await service.emit<TaskTelemetryEvent>({
+        type: 'task.created',
+        taskId: 'task_2',
+        project: 'projectB',
+      });
 
       const events = await service.getEvents({ project: 'projectA' });
       expect(events.length).toBe(1);
@@ -162,9 +178,9 @@ describe('TelemetryService', () => {
 
     it('should sort by timestamp descending (newest first)', async () => {
       await service.emit<TaskTelemetryEvent>({ type: 'task.created', taskId: 'task_1' });
-      await new Promise(r => setTimeout(r, 10)); // Small delay to ensure different timestamps
+      await new Promise((r) => setTimeout(r, 10)); // Small delay to ensure different timestamps
       await service.emit<TaskTelemetryEvent>({ type: 'task.created', taskId: 'task_2' });
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
       await service.emit<TaskTelemetryEvent>({ type: 'task.created', taskId: 'task_3' });
 
       const events = await service.getEvents();
@@ -192,7 +208,7 @@ describe('TelemetryService', () => {
 
       const events = await service.getTaskEvents('task_1');
       expect(events.length).toBe(2);
-      expect(events.every(e => e.taskId === 'task_1')).toBe(true);
+      expect(events.every((e) => e.taskId === 'task_1')).toBe(true);
     });
   });
 
@@ -204,7 +220,7 @@ describe('TelemetryService', () => {
       await service.clear();
 
       const files = await fs.readdir(testDir);
-      const eventFiles = files.filter(f => f.endsWith('.ndjson'));
+      const eventFiles = files.filter((f) => f.endsWith('.ndjson'));
       expect(eventFiles.length).toBe(0);
     });
   });
@@ -226,6 +242,34 @@ describe('TelemetryService', () => {
       expect(service.isEnabled()).toBe(true);
       service.configure({ enabled: false });
       expect(service.isEnabled()).toBe(false);
+    });
+  });
+
+  describe('durationMs validation', () => {
+    it('should reject durationMs values exceeding 7 days', async () => {
+      const sevenDaysMs = 604800000; // 7 days in milliseconds
+
+      // Test: value exactly at limit (should pass)
+      const validEvent = await service.emit<RunTelemetryEvent>({
+        type: 'run.completed',
+        taskId: 'task_123',
+        agent: 'veritas',
+        durationMs: sevenDaysMs,
+        success: true,
+      });
+      expect(validEvent.durationMs).toBe(sevenDaysMs);
+
+      // Test: value exceeding limit (should be capped or rejected)
+      const invalidEvent = await service.emit<RunTelemetryEvent>({
+        type: 'run.completed',
+        taskId: 'task_456',
+        agent: 'veritas',
+        durationMs: sevenDaysMs + 1000, // 7 days + 1 second
+        success: true,
+      });
+
+      // Verify the excessive value is either capped at 7 days or flagged
+      expect(invalidEvent.durationMs).toBeLessThanOrEqual(sevenDaysMs);
     });
   });
 });

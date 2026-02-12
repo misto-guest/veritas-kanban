@@ -120,6 +120,18 @@ export class TelemetryService {
 
     await this.init();
 
+    // Validate durationMs for run events (cap at 7 days = 604,800,000 ms)
+    const MAX_DURATION_MS = 604800000;
+    if ('durationMs' in event && typeof event.durationMs === 'number') {
+      if (event.durationMs > MAX_DURATION_MS) {
+        log.warn(
+          { originalDuration: event.durationMs, cappedDuration: MAX_DURATION_MS },
+          'durationMs exceeds 7 days, capping to maximum'
+        );
+        (event as any).durationMs = MAX_DURATION_MS;
+      }
+    }
+
     const fullEvent: T = {
       ...event,
       id: `evt_${nanoid(12)}`,
