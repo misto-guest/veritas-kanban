@@ -4,7 +4,9 @@ import path from 'path';
 import os from 'os';
 import { MigrationService } from '../services/migration-service.js';
 import { TaskService } from '../services/task-service.js';
+import { ConfigService } from '../services/config-service.js';
 import type { TaskStatus } from '@veritas-kanban/shared';
+import { DEFAULT_FEATURE_SETTINGS } from '@veritas-kanban/shared';
 
 describe('MigrationService', () => {
   let taskService: TaskService;
@@ -14,6 +16,19 @@ describe('MigrationService', () => {
   let archiveDir: string;
 
   beforeEach(async () => {
+    // Mock ConfigService to disable enforcement gates for all migration tests
+    vi.spyOn(ConfigService.prototype, 'getFeatureSettings').mockResolvedValue({
+      ...DEFAULT_FEATURE_SETTINGS,
+      enforcement: {
+        reviewGate: false,
+        closingComments: false,
+        squadChat: false,
+        autoTelemetry: false,
+        autoTimeTracking: false,
+        orchestratorDelegation: false,
+      },
+    } as any);
+
     // Create fresh test directories with unique suffix
     const uniqueSuffix = Math.random().toString(36).substring(7);
     testRoot = path.join(os.tmpdir(), `veritas-test-migration-${uniqueSuffix}`);
@@ -32,6 +47,7 @@ describe('MigrationService', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     // Clean up test directories
     if (testRoot) {
       await fs.rm(testRoot, { recursive: true, force: true }).catch(() => {});
@@ -41,7 +57,7 @@ describe('MigrationService', () => {
   describe('TaskStatus type validation', () => {
     it('should recognize "blocked" as a valid TaskStatus', () => {
       const validStatuses: TaskStatus[] = ['todo', 'in-progress', 'blocked', 'done'];
-      
+
       expect(validStatuses).toContain('blocked');
       expect(validStatuses).not.toContain('review');
     });
@@ -99,7 +115,7 @@ This task has the legacy review status.
 
       // Verify statuses are unchanged
       const tasks = await taskService.listTasks();
-      const taskMap = new Map(tasks.map(t => [t.title, t.status]));
+      const taskMap = new Map(tasks.map((t) => [t.title, t.status]));
 
       expect(taskMap.get('Todo Task')).toBe('todo');
       expect(taskMap.get('In Progress Task')).toBe('in-progress');
@@ -165,14 +181,8 @@ updated: '2026-01-26T10:00:00.000Z'
 Second review task.
 `;
 
-      await fs.writeFile(
-        path.join(tasksDir, 'task_20260126_multi1-multi-task-1.md'),
-        task1
-      );
-      await fs.writeFile(
-        path.join(tasksDir, 'task_20260126_multi2-multi-task-2.md'),
-        task2
-      );
+      await fs.writeFile(path.join(tasksDir, 'task_20260126_multi1-multi-task-1.md'), task1);
+      await fs.writeFile(path.join(tasksDir, 'task_20260126_multi2-multi-task-2.md'), task2);
 
       // Run migrations
       await migrationService.runMigrations();
@@ -180,7 +190,7 @@ Second review task.
       // Verify both tasks were migrated
       const tasks = await taskService.listTasks();
       expect(tasks).toHaveLength(2);
-      expect(tasks.every(t => t.status === 'blocked')).toBe(true);
+      expect(tasks.every((t) => t.status === 'blocked')).toBe(true);
     });
 
     it('should convert archived tasks with review status to blocked', async () => {

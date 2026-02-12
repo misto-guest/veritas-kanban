@@ -514,7 +514,12 @@ export class TaskService {
           }
 
           // Enforcement: 4x10 Review Gate (only if enforcement settings are explicitly configured)
-          if (settings.enforcement?.reviewGate === true) {
+          // Only applies to code-related task types
+          const CODE_TASK_TYPES = ['code', 'bug', 'feature', 'automation', 'system'];
+          if (
+            settings.enforcement?.reviewGate === true &&
+            CODE_TASK_TYPES.includes(freshTask.type)
+          ) {
             const scores = input.reviewScores ?? freshTask.reviewScores ?? [];
             const allPerfect = scores.length === 4 && scores.every((s: number) => s === 10);
             if (!allPerfect) {

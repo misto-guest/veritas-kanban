@@ -60,11 +60,34 @@ describe('Enforcement gates', () => {
     );
     service = new TaskService({ tasksDir, archiveDir });
 
-    const task = await service.createTask({ title: 'Review gate enabled' });
+    const task = await service.createTask({ title: 'Review gate enabled', type: 'code' });
 
     await expect(service.updateTask(task.id, { status: 'done' })).rejects.toThrow(
       'Cannot complete task without all four review scores = 10'
     );
+  });
+
+  it('does not enforce review gate for non-code task types', async () => {
+    vi.spyOn(ConfigService.prototype, 'getFeatureSettings').mockResolvedValue(
+      buildSettings({ enforcement: { reviewGate: true } }) as any
+    );
+    service = new TaskService({ tasksDir, archiveDir });
+
+    const contentTask = await service.createTask({
+      title: 'Content task',
+      type: 'content',
+    });
+    const researchTask = await service.createTask({
+      title: 'Research task',
+      type: 'research',
+    });
+
+    // Should complete without review scores
+    const updatedContent = await service.updateTask(contentTask.id, { status: 'done' });
+    const updatedResearch = await service.updateTask(researchTask.id, { status: 'done' });
+
+    expect(updatedContent.status).toBe('done');
+    expect(updatedResearch.status).toBe('done');
   });
 
   it('does not enforce closing comments when disabled', async () => {
