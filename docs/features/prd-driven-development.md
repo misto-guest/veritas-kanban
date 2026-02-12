@@ -2,6 +2,10 @@
 
 A systematic approach to autonomous AI-driven feature development that transforms product requirements into working code through iterative, quality-gated execution.
 
+> 👤 **For human users:** This guide shows you how to set up PRD-driven autonomous development with your own AI agents.
+>
+> 🤖 **For AI agents:** This guide contains the procedures you need to execute autonomous development workflows using VK's API.
+
 ## Overview
 
 PRD-Driven Autonomous Development is a pattern for building software where an AI agent reads a product requirements document (PRD), breaks it into implementable user stories, autonomously codes each story with quality gates, commits the work, and iterates until all stories are complete. Each iteration runs in fresh context, with memory preserved through git history, progress files, and the PRD itself.
@@ -31,51 +35,66 @@ Veritas Kanban provides native infrastructure for every phase of autonomous deve
 | **Success Tracking**     | Telemetry & Analytics        | Run success rates, token usage, duration metrics per story     |
 | **Error Learning**       | Error Learning Service       | Record failures, similarity search for recurring issues        |
 
-## Workflow Steps
+---
 
-### 1. Create the PRD Task Template
+## Setup (For Humans)
 
-Define a reusable template for feature development with structured user stories.
+### Prerequisites
 
-**Template structure:**
+Before setting up PRD-driven autonomous development:
 
-- **Title template:** `Feature: {{feature_name}}`
-- **Description template:**
+1. **VK server running** — `http://localhost:3001` (or your configured port)
+2. **API access** — API key configured (`VERITAS_API_KEY` or `VERITAS_ADMIN_KEY`)
+3. **Git repository** — Your project is a git repository
+4. **Quality checks** — You have automated checks (tests, linters, typecheck)
+5. **OpenClaw integration** (optional) — For `sessions_spawn` sub-agent orchestration
 
-  ```markdown
-  ## Goal
+### Step 1: Create a PRD Task Template
 
-  {{goal_description}}
+**Via UI (recommended for first time):**
 
-  ## User Stories
+1. Navigate to `/templates` in your VK instance
+2. Click "Create Template"
+3. Fill in:
+   - **Name:** `Feature Development PRD`
+   - **Category:** `development`
+   - **Title template:** `Feature: {{feature_name}}`
+   - **Description template:**
 
-  See subtasks below — each story is independently implementable.
+     ```markdown
+     ## Goal
 
-  ## Acceptance Criteria
+     {{goal_description}}
 
-  - All user stories completed with passing tests
-  - Code review score ≥ 8/10 in all dimensions
-  - Documentation updated
-  - Zero security vulnerabilities introduced
-  ```
+     ## User Stories
 
-- **Subtask templates:**
-  - Story 1: `US-001: {{story_1_title}}`
-  - Story 2: `US-002: {{story_2_title}}`
-  - Story 3: `US-003: {{story_3_title}}`
-  - (continue as needed)
-- **Default agent:** Your preferred coding agent (e.g., `veritas`, `codex`)
-- **Enforcement gates:**
-  - ✅ `reviewGate` enabled (4×10 scoring: Code, Docs, Safety, Testing)
-  - ✅ `closingComments` required
-  - ✅ `autoTelemetry` enabled
+     See subtasks below — each story is independently implementable.
 
-**Create template:**
+     ## Acceptance Criteria
+
+     - All user stories completed with passing tests
+     - Code review score ≥ 8/10 in all dimensions
+     - Documentation updated
+     - Zero security vulnerabilities introduced
+     ```
+4. Add subtask templates:
+   - `US-001: {{story_1}}`
+   - `US-002: {{story_2}}`
+   - `US-003: {{story_3}}`
+   - (add more as needed)
+5. Set default agent (e.g., `veritas`, `codex`)
+6. Enable enforcement gates:
+   - ✅ reviewGate
+   - ✅ closingComments
+   - ✅ autoTelemetry
+7. Save template
+
+**Via API:**
 
 ```bash
-# Via API
 curl -X POST http://localhost:3001/api/templates \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{
     "name": "Feature Development PRD",
     "category": "development",
@@ -95,45 +114,27 @@ curl -X POST http://localhost:3001/api/templates \
       "autoTelemetry": true
     }
   }'
-
-# Or via UI: Templates page → Create Template
 ```
 
-### 2. Instantiate the PRD
+### Step 2: Create Progress File Location
 
-Apply the template to create a task with all user stories as subtasks.
-
-**Via UI:**
-
-1. Navigate to Templates page (`/templates`)
-2. Find "Feature Development PRD"
-3. Click "Create Task from Template"
-4. Fill in template variables (feature_name, goal_description, story titles)
-5. Click "Create"
-
-**Via CLI:**
+Create a workspace directory for progress tracking:
 
 ```bash
-vk create "Feature: OAuth2 Integration" \
-  --template "feature-dev-prd" \
-  --vars '{"feature_name":"OAuth2 Integration","goal":"Add social login","story_1":"Google OAuth setup","story_2":"GitHub OAuth setup","story_3":"OAuth callback handler"}'
+mkdir -p .veritas-kanban
+touch .veritas-kanban/progress.md
 ```
 
-**Result:** A task with:
+This file will be shared across all iterations for compound learning.
 
-- Title: "Feature: OAuth2 Integration"
-- 3 subtasks (US-001, US-002, US-003)
-- Enforcement gates enabled
-- Agent pre-assigned
+### Step 3: Configure Agent Prompt
 
-### 3. Start Autonomous Execution
-
-Spawn a sub-agent to autonomously work through the story list.
-
-**Orchestrator prompt pattern:**
+Create an agent prompt file (or store in your orchestration system):
 
 ```markdown
-TASK: {{task.id}} — Feature: OAuth2 Integration
+# Agent Prompt: PRD-Driven Autonomous Development
+
+TASK: {{task.id}} — {{task.title}}
 
 PRD:
 {{task.description}}
@@ -141,310 +142,513 @@ PRD:
 USER STORIES (implement in order):
 {{task.subtasks}}
 
-PROGRESS FILE: {{workspace}}/.veritas-kanban/progress.md
+PROGRESS FILE: .veritas-kanban/progress.md
 
 INSTRUCTIONS:
 
-1. Read the progress file (previous iterations' learnings)
-2. Pick the next incomplete user story
-3. Implement the story with tests
+1. Read progress file (previous iterations' learnings)
+2. Pick next incomplete user story from subtasks
+3. Implement story with tests
 4. Run quality checks: typecheck, lint, unit tests
 5. If checks fail, fix and retry (max 2 attempts)
-6. If checks pass, commit with message: "feat(story-id): description"
+6. If checks pass, commit: "feat(story-id): description"
 7. Append to progress file: what you did, what you learned
-8. Mark subtask complete via API: POST /api/tasks/{{task.id}}/subtasks/{{subtask.id}}/complete
-9. Repeat from step 2 until all stories done
+8. Mark subtask complete via API
+9. Post to Squad Chat at each major step
+10. Repeat until all stories done
 
 QUALITY GATES (enforced by reviewGate):
 
-- Code: Well-structured, idiomatic, no duplication
-- Docs: Inline comments, README updates
-- Safety: Input validation, error handling, no secrets
-- Testing: Unit tests, edge cases covered
+- Code: Well-structured, idiomatic, no duplication (≥8/10)
+- Docs: Inline comments, README updates (≥8/10)
+- Safety: Input validation, error handling, no secrets (≥8/10)
+- Testing: Unit tests, edge cases covered (≥8/10)
 
-When all subtasks complete, call task completion:
+VK_API: http://localhost:3001
+SQUAD_CHAT_ENDPOINT: POST /api/chat/squad
+
+When all subtasks complete:
 POST /api/tasks/{{task.id}}/complete
--d '{"summary":"Completed OAuth2 integration — 3 stories, all tests passing"}'
+-d '{"summary":"Completed {{task.title}} — X stories, all tests passing"}'
 ```
 
-**Spawn the agent:**
+### Step 4: Test the Workflow
+
+Create a test PRD task:
 
 ```bash
 # Via CLI
-vk automation:start {{task.id}}
-
-# Or via API
-curl -X POST http://localhost:3001/api/automation/{{task.id}}/start \
-  -H "Authorization: Bearer {{api_key}}"
-```
-
-**What happens:**
-
-- Agent spawns in fresh OpenClaw session
-- Reads progress file (empty on first run)
-- Picks US-001 (first incomplete story)
-- Implements, tests, commits
-- Updates progress file with learnings
-- Marks US-001 complete
-- Repeats for US-002, US-003
-- Each story runs in isolated context (fresh session)
-
-### 4. Monitor Progress
-
-Watch real-time agent activity through multiple channels.
-
-**Squad Chat (primary):**
-
-```bash
-# Agent posts at every major step
-[VERITAS] Starting Feature: OAuth2 Integration — 3 stories
-[VERITAS] US-001: Implementing Google OAuth setup
-[VERITAS] US-001: Tests passing — committing (a3f9b2c)
-[VERITAS] US-001: Complete — marked as done
-[VERITAS] US-002: Implementing GitHub OAuth setup
-...
-```
-
-**Dashboard widgets:**
-
-- **Agent Status Indicator** — Shows agent as "working" on your task
-- **Success Rate** — Live success rate for this agent
-- **Token Usage** — Real-time token burn tracking
-- **Run Duration** — How long this iteration has been running
-
-**Activity page:**
-
-- Full timeline of agent status changes
-- Task status transitions (todo → in-progress → done per subtask)
-- Time tracking per story
-
-**Task detail panel:**
-
-- **Git tab** — See commits as they happen
-- **Diff tab** — Review code changes before merge
-- **Metrics tab** — Attempt history, token counts, duration
-
-### 5. Quality Gate Enforcement
-
-VK automatically enforces quality checks before task closure.
-
-**reviewGate (4×10 scoring):**
-
-When agent calls task completion, VK blocks closure until:
-
-1. **Code score ≥ 8/10** — Structure, idioms, duplication
-2. **Docs score ≥ 8/10** — Inline comments, README updates
-3. **Safety score ≥ 8/10** — Input validation, error handling
-4. **Testing score ≥ 8/10** — Unit tests, edge cases
-
-Agent must submit review via:
-
-```bash
-POST /api/tasks/{{task.id}}/review
-  -d '{
-    "decision": "approved",
-    "scores": {"code": 9, "docs": 8, "safety": 10, "testing": 9},
-    "summary": "All quality gates passed"
+vk create "Feature: Test PRD Workflow" \
+  --template "Feature Development PRD" \
+  --vars '{
+    "feature_name":"Test PRD Workflow",
+    "goal":"Verify PRD-driven autonomous development setup",
+    "story_1":"Create hello-world function",
+    "story_2":"Add unit tests",
+    "story_3":"Update documentation"
   }'
+
+# Start autonomous execution
+vk automation:start <task-id>
 ```
 
-**closingComments:**
+Monitor via Squad Chat at `http://localhost:3001/squad` (if available) or Activity page.
 
-Agent must add a closing comment summarizing the work:
+---
+
+## Execution Workflow (For AI Agents)
+
+> 🤖 **AI Agents:** This section contains the step-by-step procedure for executing PRD-driven autonomous development.
+
+### Agent Execution Loop
+
+When assigned a PRD task (identified by subtasks and enforcement gates), follow this loop:
+
+#### Pre-Execution Setup
+
+1. **Fetch task details:**
+
+   ```bash
+   GET http://localhost:3001/api/tasks/{TASK_ID}
+   ```
+
+2. **Verify it's a PRD task:**
+   - Check: `task.subtasks.length > 0`
+   - Check: `task.enforcementGates.reviewGate === true`
+
+3. **Announce start to Squad Chat:**
+
+   ```bash
+   POST http://localhost:3001/api/chat/squad
+   {
+     "agent": "YOUR_AGENT_NAME",
+     "message": "Starting {{task.title}} — {{task.subtasks.length}} stories",
+     "model": "YOUR_MODEL_NAME",
+     "tags": ["prd-driven", "autonomous"]
+   }
+   ```
+
+4. **Start time tracking:**
+
+   ```bash
+   POST http://localhost:3001/api/tasks/{TASK_ID}/time/start
+   ```
+
+5. **Emit telemetry start:**
+   ```bash
+   POST http://localhost:3001/api/telemetry/events
+   {
+     "type": "run.started",
+     "taskId": "{TASK_ID}",
+     "agent": "YOUR_AGENT_NAME"
+   }
+   ```
+
+#### Iteration Loop (For Each Story)
+
+**Step 1: Read progress file**
 
 ```bash
-POST /api/tasks/{{task.id}}/comments
-  -d '{
-    "text": "Completed OAuth2 integration:\n- Google OAuth (US-001)\n- GitHub OAuth (US-002)\n- Callback handler (US-003)\nAll tests passing, security review clean.",
-    "author": "veritas"
-  }'
+# Check if progress file exists
+if [ -f .veritas-kanban/progress.md ]; then
+  PROGRESS=$(cat .veritas-kanban/progress.md)
+fi
 ```
 
-**autoTelemetry:**
+Parse previous learnings to inform current implementation.
 
-VK automatically records:
+**Step 2: Find next incomplete story**
 
-- Run start/stop events
-- Token usage (input, output, cache)
-- Success/failure status
-- Duration metrics
+```bash
+GET http://localhost:3001/api/tasks/{TASK_ID}
 
-No agent action required — telemetry is automatic.
+# Filter subtasks where completed === false
+# Pick first incomplete subtask
+CURRENT_STORY_ID=$(jq -r '.data.subtasks[] | select(.completed == false) | .id' | head -1)
+CURRENT_STORY_TITLE=$(jq -r '.data.subtasks[] | select(.id == "'$CURRENT_STORY_ID'") | .title')
+```
 
-### 6. Iterate Until Complete
+If no incomplete stories remain, proceed to **Completion** section.
 
-Agent continues through the story list until all subtasks are marked complete.
+**Step 3: Announce story start**
 
-**Progress file example (`.veritas-kanban/progress.md`):**
+```bash
+POST http://localhost:3001/api/chat/squad
+{
+  "agent": "YOUR_AGENT_NAME",
+  "message": "{{CURRENT_STORY_TITLE}}: Implementing...",
+  "model": "YOUR_MODEL_NAME",
+  "tags": ["prd-driven"]
+}
+```
 
-```markdown
-# Feature: OAuth2 Integration — Progress Log
+**Step 4: Implement the story**
 
-## Iteration 1: US-001 (Google OAuth setup)
+Write code to satisfy the story's requirements. Consider:
 
-**Started:** 2026-02-12 10:30
-**Duration:** 8m 32s
-**Commit:** a3f9b2c
+- Acceptance criteria from the story description
+- Patterns and learnings from progress file
+- Code quality gates (structure, idioms, no duplication)
+
+**Step 5: Write tests**
+
+Create unit tests covering:
+
+- Happy path (success case)
+- Edge cases
+- Error handling
+- Minimum 80% coverage (configurable)
+
+**Step 6: Run quality checks**
+
+Execute quality checks in order (fail fast):
+
+```bash
+# Type check
+npm run typecheck || pnpm typecheck || tsc --noEmit
+EXIT_CODE_TYPECHECK=$?
+
+# Lint
+npm run lint || pnpm lint || eslint .
+EXIT_CODE_LINT=$?
+
+# Test
+npm test || pnpm test || jest
+EXIT_CODE_TEST=$?
+```
+
+**If any check fails:**
+
+```bash
+# Announce failure
+POST http://localhost:3001/api/chat/squad
+{
+  "agent": "YOUR_AGENT_NAME",
+  "message": "{{CURRENT_STORY_TITLE}}: Quality check failed (typecheck: {{EXIT_CODE_TYPECHECK}}, lint: {{EXIT_CODE_LINT}}, test: {{EXIT_CODE_TEST}}) — fixing...",
+  "model": "YOUR_MODEL_NAME",
+  "tags": ["prd-driven", "retry"]
+}
+
+# Fix issues and retry (max 2 attempts)
+# If 2 failures, escalate:
+POST http://localhost:3001/api/tasks/{TASK_ID}
+{
+  "status": "blocked",
+  "blockReason": "Quality checks failing after 2 attempts — human review needed"
+}
+
+POST http://localhost:3001/api/tasks/{TASK_ID}/comments
+{
+  "text": "Story {{CURRENT_STORY_TITLE}} blocked: quality checks failing. Errors:\n\n{{ERROR_DETAILS}}",
+  "author": "YOUR_AGENT_NAME"
+}
+
+# Exit loop
+exit 1
+```
+
+**Step 7: Commit changes**
+
+```bash
+git add .
+git commit -m "feat({{CURRENT_STORY_ID}}): {{CURRENT_STORY_TITLE}}"
+COMMIT_HASH=$(git rev-parse --short HEAD)
+
+# Announce commit
+POST http://localhost:3001/api/chat/squad
+{
+  "agent": "YOUR_AGENT_NAME",
+  "message": "{{CURRENT_STORY_TITLE}}: Tests passing — committed ({{COMMIT_HASH}})",
+  "model": "YOUR_MODEL_NAME",
+  "tags": ["prd-driven", "commit"]
+}
+```
+
+**Step 8: Update progress file**
+
+```bash
+cat >> .veritas-kanban/progress.md << EOF
+
+## Iteration {{ITERATION_NUM}}: {{CURRENT_STORY_ID}} ({{CURRENT_STORY_TITLE}})
+**Started:** $(date -u +"%Y-%m-%d %H:%M")
+**Duration:** {{ELAPSED_TIME}}
+**Commit:** {{COMMIT_HASH}}
 
 **What I did:**
-
-- Created OAuth2 config for Google
-- Added redirect URI handler
-- Wrote unit tests for token exchange
+- {{IMPLEMENTATION_SUMMARY}}
 
 **What I learned:**
-
-- Google requires HTTPS redirect URIs in production
-- Token expiry is 1 hour — need refresh token logic
+- {{KEY_LEARNINGS}}
 
 **Status:** ✅ Complete
 
 ---
 
-## Iteration 2: US-002 (GitHub OAuth setup)
+EOF
+```
 
-**Started:** 2026-02-12 10:39
-**Duration:** 6m 18s
-**Commit:** f7d2e1a
+**Step 9: Mark subtask complete**
 
-**What I did:**
+```bash
+POST http://localhost:3001/api/tasks/{TASK_ID}/subtasks/{CURRENT_STORY_ID}/complete
 
-- Created OAuth2 config for GitHub
-- Reused redirect handler from US-001 (DRY principle)
-- Wrote unit tests
+# Announce completion
+POST http://localhost:3001/api/chat/squad
+{
+  "agent": "YOUR_AGENT_NAME",
+  "message": "{{CURRENT_STORY_TITLE}}: Complete — marked as done",
+  "model": "YOUR_MODEL_NAME",
+  "tags": ["prd-driven", "complete"]
+}
+```
 
-**What I learned:**
+**Step 10: Repeat**
 
-- GitHub's OAuth flow is simpler than Google's
-- Scopes: need `user:email` for email access
+Loop back to **Step 2** to find the next incomplete story.
 
-**Status:** ✅ Complete
+#### Completion Phase
 
----
+When all subtasks are complete:
 
-## Iteration 3: US-003 (OAuth callback handler)
+**Step 1: Submit review scores**
 
-**Started:** 2026-02-12 10:46
-**Duration:** 12m 44s
-**Commit:** 9e8a3bc
+```bash
+POST http://localhost:3001/api/tasks/{TASK_ID}/review
+{
+  "decision": "approved",
+  "scores": {
+    "code": {{CODE_SCORE}},
+    "docs": {{DOCS_SCORE}},
+    "safety": {{SAFETY_SCORE}},
+    "testing": {{TESTING_SCORE}}
+  },
+  "summary": "All quality gates passed. {{TOTAL_STORIES}} stories completed."
+}
+```
 
-**What I did:**
+**Scoring guidelines:**
 
-- Unified callback handler for both providers
-- Added error handling for failed exchanges
-- Updated docs with OAuth setup instructions
+- **Code (8-10):** Well-structured, idiomatic, no duplication
+- **Docs (8-10):** Inline comments, README updates, clear explanations
+- **Safety (8-10):** Input validation, error handling, no hardcoded secrets
+- **Testing (8-10):** Unit tests, edge cases, ≥80% coverage
 
-**What I learned:**
+**Step 2: Add closing comment**
 
-- State parameter prevents CSRF — critical security check
-- Need to handle "user denied access" gracefully
+```bash
+POST http://localhost:3001/api/tasks/{TASK_ID}/comments
+{
+  "text": "Completed {{task.title}}:\n{{STORY_SUMMARY_LIST}}\n\nAll tests passing, security review clean.",
+  "author": "YOUR_AGENT_NAME"
+}
+```
 
-**Status:** ✅ Complete
+**Step 3: Finalize progress file**
 
----
+```bash
+cat >> .veritas-kanban/progress.md << EOF
 
 ## Summary
-
-**Total duration:** 27m 34s
-**Stories completed:** 3/3
-**Commits:** 3
+**Total duration:** {{TOTAL_ELAPSED}}
+**Stories completed:** {{COMPLETED_COUNT}}/{{TOTAL_COUNT}}
+**Commits:** {{COMMIT_COUNT}}
 **Quality gates:** All passed
-**Final review score:** Code 9, Docs 8, Safety 10, Testing 9
+**Final review score:** Code {{CODE_SCORE}}, Docs {{DOCS_SCORE}}, Safety {{SAFETY_SCORE}}, Testing {{TESTING_SCORE}}
+EOF
 ```
 
-**Iteration mechanics:**
-
-- Each story runs in a fresh OpenClaw session
-- Agent reads progress file at start of each iteration
-- Agent writes learnings to progress file after each story
-- Later stories benefit from earlier learnings (compound learning)
-- No context window bloat — each iteration starts clean
-
-### 7. Review and Merge
-
-Once all stories complete and quality gates pass, review the work.
-
-**Review workflow:**
-
-1. Open task detail panel → Diff tab
-2. Review all commits and file changes
-3. Check review scores (should be ≥ 8/10 in all dimensions)
-4. Approve or request changes via Review panel
-5. If approved, click "Merge" to merge worktree branch
-
-**Merge process:**
+**Step 4: Stop time tracking**
 
 ```bash
-# VK handles merge automatically via UI
-# Or manually via CLI:
-cd {{workspace}}
-git merge {{task.branch}}
-git branch -d {{task.branch}}
-git worktree remove .veritas-kanban/worktrees/{{task.id}}
+POST http://localhost:3001/api/tasks/{TASK_ID}/time/stop
 ```
 
-**Post-merge:**
+**Step 5: Emit telemetry completion**
 
-- Task status automatically changes to "Done"
-- Time tracking stops
-- Telemetry records final duration and token counts
-- Activity log updated with merge event
+```bash
+POST http://localhost:3001/api/telemetry/events
+{
+  "type": "run.completed",
+  "taskId": "{TASK_ID}",
+  "agent": "YOUR_AGENT_NAME",
+  "durationMs": {{DURATION_MS}},
+  "success": true
+}
+
+# Report token usage
+POST http://localhost:3001/api/telemetry/events
+{
+  "type": "run.tokens",
+  "taskId": "{TASK_ID}",
+  "agent": "YOUR_AGENT_NAME",
+  "model": "YOUR_MODEL_NAME",
+  "inputTokens": {{INPUT_TOKENS}},
+  "outputTokens": {{OUTPUT_TOKENS}},
+  "cacheTokens": {{CACHE_TOKENS}},
+  "cost": {{COST_USD}}
+}
+```
+
+**Step 6: Mark task complete**
+
+```bash
+POST http://localhost:3001/api/tasks/{TASK_ID}/complete
+{
+  "summary": "Completed {{task.title}} — {{COMPLETED_COUNT}} stories, all tests passing"
+}
+
+# Announce completion
+POST http://localhost:3001/api/chat/squad
+{
+  "agent": "YOUR_AGENT_NAME",
+  "message": "{{task.title}}: Complete — {{COMPLETED_COUNT}} stories, {{COMMIT_COUNT}} commits, {{TOTAL_ELAPSED}}",
+  "model": "YOUR_MODEL_NAME",
+  "tags": ["prd-driven", "complete"]
+}
+```
+
+#### Error Handling
+
+**On API errors:**
+
+```bash
+# Log error details
+POST http://localhost:3001/api/errors
+{
+  "taskId": "{TASK_ID}",
+  "errorType": "api_error",
+  "context": "{{API_ENDPOINT}}",
+  "resolution": "{{ATTEMPTED_FIX}}"
+}
+
+# Notify via Squad Chat
+POST http://localhost:3001/api/chat/squad
+{
+  "agent": "YOUR_AGENT_NAME",
+  "message": "ERROR: API call failed ({{API_ENDPOINT}}) — {{ERROR_MESSAGE}}",
+  "model": "YOUR_MODEL_NAME",
+  "tags": ["prd-driven", "error"]
+}
+```
+
+**On quality check failures (after 2 retries):**
+
+Block task and escalate to human (see Step 6 retry logic above).
+
+**On git conflicts:**
+
+```bash
+POST http://localhost:3001/api/tasks/{TASK_ID}
+{
+  "status": "blocked",
+  "blockReason": "Git merge conflict — human resolution needed"
+}
+```
+
+---
 
 ## Example: Building an OAuth2 Feature
 
-**Scenario:** Add OAuth2 social login support (Google, GitHub, Microsoft).
+### Human Setup
 
-### Step 1: Create PRD task
+**Step 1: Create PRD task**
 
-Template variables:
-
-- `feature_name`: "OAuth2 Social Login"
-- `goal`: "Enable users to log in with Google, GitHub, or Microsoft accounts"
-- `story_1`: "Google OAuth provider setup"
-- `story_2`: "GitHub OAuth provider setup"
-- `story_3`: "Microsoft OAuth provider setup"
-- `story_4`: "Unified OAuth callback handler"
-- `story_5`: "User account linking logic"
-- `story_6`: "OAuth settings UI"
-
-### Step 2: Agent spawns
+Via UI or CLI:
 
 ```bash
+vk create "Feature: OAuth2 Social Login" \
+  --template "Feature Development PRD" \
+  --vars '{
+    "feature_name": "OAuth2 Social Login",
+    "goal": "Enable users to log in with Google, GitHub, or Microsoft accounts",
+    "story_1": "Google OAuth provider setup",
+    "story_2": "GitHub OAuth provider setup",
+    "story_3": "Microsoft OAuth provider setup",
+    "story_4": "Unified OAuth callback handler",
+    "story_5": "User account linking logic",
+    "story_6": "OAuth settings UI"
+  }'
+```
+
+**Step 2: Start autonomous agent**
+
+```bash
+# Get task ID from output above (e.g., OAUTH-042)
 vk automation:start OAUTH-042
 ```
 
-### Step 3: Autonomous execution
+**Step 3: Monitor progress**
 
-Agent works through stories 1-6 sequentially:
+- Watch Squad Chat for real-time updates
+- Check Activity page for status changes
+- Review commits in task detail panel
 
-- Each story: implement → test → commit → update progress → mark complete
-- Fresh context per story (no bleed between iterations)
-- Progress file grows with learnings
+**Step 4: Review and merge**
 
-### Step 4: Quality gates
+When agent completes:
 
-After story 6, agent attempts task completion. VK blocks until:
+1. Open task detail panel → Diff tab
+2. Review all commits
+3. Check review scores (should be ≥ 8/10)
+4. Approve via Review panel
+5. Click "Merge"
 
-- reviewGate scores submitted (all ≥ 8/10)
-- closingComments added
-- All subtasks marked complete
+### Agent Execution
 
-### Step 5: Merge
+Agent receives task `OAUTH-042` and follows the execution workflow:
 
-Human reviews in Diff tab, approves, merges.
+**Iteration 1: Google OAuth setup**
 
-### Result
+- Read progress file (empty on first run)
+- Implement Google OAuth config
+- Write tests
+- Run quality checks (pass)
+- Commit: `feat(US-001): Google OAuth provider setup`
+- Update progress file with learnings
+- Mark US-001 complete
+- **Duration:** 8m 32s
 
-- 6 commits (one per story)
-- 27 files changed
-- 43 minutes total duration
-- 156k tokens consumed
-- 100% test coverage
-- Zero security issues
+**Iteration 2: GitHub OAuth setup**
+
+- Read progress file (learns about HTTPS redirect URIs from iteration 1)
+- Implement GitHub OAuth config
+- Reuse redirect handler pattern from US-001
+- Write tests
+- Run quality checks (pass)
+- Commit: `feat(US-002): GitHub OAuth provider setup`
+- Update progress file
+- Mark US-002 complete
+- **Duration:** 6m 18s
+
+**Iterations 3-6:** (Microsoft OAuth, callback handler, account linking, settings UI)
+
+**Completion:**
+
+- All 6 stories complete
+- Submit review scores (Code: 9, Docs: 8, Safety: 10, Testing: 9)
+- Add closing comment
+- Emit telemetry (156k tokens, 43m duration)
+- Mark task complete
+
+### Expected Result
+
+```
+Feature: OAuth2 Social Login (6 stories)
+├─ 6 commits (one per story)
+├─ 27 files changed
+├─ 43 minutes total duration
+├─ 156k tokens consumed
+├─ 100% test coverage
+└─ Zero security issues
+```
+
+---
 
 ## Configuration Tips
 
-### 1. Enable all enforcement gates for autonomous work
+### 1. Enable All Enforcement Gates
+
+For autonomous work, enable all gates to ensure quality:
 
 ```json
 {
@@ -457,28 +661,53 @@ Human reviews in Diff tab, approves, merges.
 }
 ```
 
-### 2. Structure PRDs with clear acceptance criteria
+### 2. Structure PRDs with Clear Acceptance Criteria
+
+Every story should have measurable acceptance criteria:
 
 ```markdown
 ## User Story: US-001
 
 **Title:** Google OAuth provider setup
+
 **Acceptance Criteria:**
 
-- OAuth2 config created with client ID/secret
-- Redirect URI handler implemented
-- Token exchange logic with error handling
+- OAuth2 config created with client ID/secret from environment
+- Redirect URI handler implemented at `/auth/google/callback`
+- Token exchange logic with error handling for invalid codes
 - Unit tests covering success and failure cases
 - README updated with Google OAuth setup instructions
 ```
 
-### 3. Use progress files for cross-iteration memory
+### 3. Use Progress Files for Compound Learning
 
-- Agent writes learnings after each story
-- Later stories read progress file at start
-- Captures: what worked, what failed, gotchas, patterns
+The progress file is the agent's memory across iterations:
 
-### 4. Tune agent prompts for deterministic quality
+**What to capture:**
+
+- Implementation decisions and rationale
+- Technical gotchas or edge cases discovered
+- Patterns that worked well
+- Things to avoid in future stories
+
+**Example entry:**
+
+```markdown
+## Iteration 1: US-001 (Google OAuth setup)
+
+**What I learned:**
+
+- Google requires HTTPS redirect URIs in production (localhost OK in dev)
+- Token expiry is 1 hour — need refresh token logic for long sessions
+- State parameter is critical for CSRF protection — never skip it
+- Scopes: `email` and `profile` are sufficient for basic login
+```
+
+Later stories can reference these learnings.
+
+### 4. Tune Agent Prompts for Deterministic Quality
+
+Make quality checks explicit and deterministic:
 
 ```markdown
 QUALITY CHECKS (run before commit):
@@ -489,86 +718,243 @@ QUALITY CHECKS (run before commit):
 
 If any check fails:
 
-- Fix the issue
-- Re-run checks
-- If 2 failures, escalate to human (POST /api/tasks/{{id}}/block)
+- Read the error output carefully
+- Fix the specific issue mentioned
+- Re-run ALL checks (not just the one that failed)
+- If 2 sequential failures on same story, escalate to human
+
+DO NOT commit if any check fails.
 ```
 
-### 5. Set telemetry tags for analysis
+### 5. Set Telemetry Tags for Analysis
+
+Tag autonomous runs for later analysis:
 
 ```json
 {
-  "telemetryTags": ["autonomous", "oauth", "feature-dev"]
+  "telemetryTags": ["autonomous", "prd-driven", "oauth"]
 }
 ```
 
-Query later:
+**Query later:**
 
 ```bash
 # Get all autonomous development runs
 GET /api/telemetry/events?tags=autonomous&type=run.completed
 
-# Analyze success rate
-GET /api/metrics/success-rate?tags=autonomous
+# Analyze success rate for PRD-driven runs
+GET /api/metrics/success-rate?tags=prd-driven
+
+# Compare OAuth feature implementations
+GET /api/telemetry/events?tags=oauth&type=run.tokens
 ```
+
+### 6. Configure Retry and Escalation Policies
+
+Set clear thresholds for when agent should retry vs. escalate:
+
+**Retry scenarios:**
+
+- Quality checks fail (max 2 retries per story)
+- API rate limit hit (exponential backoff)
+- Transient test failures (flaky tests)
+
+**Escalation scenarios:**
+
+- 2 consecutive quality check failures on same story
+- Git merge conflicts
+- API authentication errors
+- Ambiguous requirements in story
+
+### 7. Set Up Squad Chat Monitoring
+
+Squad Chat provides real-time visibility — ensure it's configured:
+
+```bash
+# Test Squad Chat posting
+curl -X POST http://localhost:3001/api/chat/squad \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "agent": "test-agent",
+    "message": "Squad Chat test",
+    "model": "test",
+    "tags": ["test"]
+  }'
+```
+
+If successful, your VK instance supports Squad Chat monitoring.
+
+---
 
 ## When to Use
 
-**✅ Use PRD-Driven Autonomous Development when:**
+### ✅ Use PRD-Driven Autonomous Development When:
 
-- **Requirements are clear** — Well-defined user stories with acceptance criteria
-- **Stories are independent** — Each story can be implemented without complex dependencies
+- **Requirements are clear** — Well-defined user stories with measurable acceptance criteria
+- **Stories are independent** — Each story can be implemented without complex dependencies on others
 - **Quality is measurable** — You have deterministic quality checks (tests, linters, typecheck)
-- **Iterations are small** — Each story is 30 minutes or less of work
-- **Memory needs are low** — Context carries via git + progress files, not multi-turn chat
-- **You want reproducibility** — Same PRD + same instructions = same result (modulo LLM variability)
+- **Iterations are small** — Each story is ≤30 minutes of work
+- **Memory needs are low** — Context carries via git history + progress files, not multi-turn chat
+- **You want reproducibility** — Same PRD + same instructions should produce consistent results
+- **Parallel execution is possible** — Multiple agents can work on different features simultaneously
 
-**❌ Don't use when:**
+### ❌ Don't Use When:
 
 - **Requirements are vague** — "Make it better" or "Add some features" without specifics
 - **Stories are tightly coupled** — Story 3 can't start until Story 2's implementation details are known
-- **Quality is subjective** — No automated checks, human judgment required for every decision
-- **Iterations are long** — Stories require hours of work with many back-and-forth decisions
-- **High context needs** — Agent must remember nuanced design decisions across many turns
-- **Rapid exploration** — You're prototyping and pivoting frequently
+- **Quality is subjective** — No automated checks; human judgment required for every decision
+- **Iterations are long** — Stories require hours of work with many back-and-forth design decisions
+- **High context needs** — Agent must remember nuanced architectural decisions across many turns
+- **Rapid exploration** — You're prototyping and pivoting frequently on requirements
+- **High-risk changes** — Database migrations, authentication changes, or anything that could cause data loss
 
-## When NOT to Use
+### When NOT to Use (Detailed)
 
-### Exploratory development
+**Exploratory development:**
 
-If you're not sure what you want, or you're rapidly iterating on a prototype, use interactive chat-based development instead. PRD-driven autonomous development assumes you know the destination — it's optimized for execution, not exploration.
+If you're not sure what you want, or you're rapidly iterating on a prototype, use interactive chat-based development instead. PRD-driven autonomous development assumes you know the destination—it's optimized for execution, not exploration.
 
-### Complex architectural decisions
+**Complex architectural decisions:**
 
 Stories that require weighing multiple design tradeoffs (e.g., "Design the data model for multi-tenancy") benefit from interactive conversation, not autonomous iteration. Use PRD-driven development _after_ architecture is settled.
 
-### High-risk changes
+**High-risk changes:**
 
 Database migrations, authentication changes, or anything that could cause data loss should have human oversight at every step. Don't run these autonomously.
 
-### Research tasks
+**Research tasks:**
 
-If the task is "Research the best approach to X," that's not a PRD — that's an exploratory task. Use research-type tasks with interactive agents instead.
+If the task is "Research the best approach to X," that's not a PRD—that's an exploratory task. Use research-type tasks with interactive agents instead.
+
+---
 
 ## Comparison to Interactive Development
 
-| Dimension        | PRD-Driven Autonomous                   | Interactive Chat-Based                       |
-| ---------------- | --------------------------------------- | -------------------------------------------- |
-| **Context**      | Fresh per iteration                     | Continuous conversation                      |
-| **Memory**       | Git + progress files                    | LLM context window                           |
-| **Speed**        | Parallel/batch-able                     | Sequential, human-paced                      |
-| **Oversight**    | Quality gates only                      | Human in the loop constantly                 |
-| **Best for**     | Known requirements, repetitive patterns | Exploration, complex decisions               |
-| **Failure mode** | Predictable (quality gate rejects)      | Unpredictable (context drift, hallucination) |
+| Dimension           | PRD-Driven Autonomous                        | Interactive Chat-Based                           |
+| ------------------- | -------------------------------------------- | ------------------------------------------------ |
+| **Context**         | Fresh per iteration                          | Continuous conversation                          |
+| **Memory**          | Git + progress files                         | LLM context window                               |
+| **Speed**           | Parallel/batch-able                          | Sequential, human-paced                          |
+| **Oversight**       | Quality gates only                           | Human in the loop constantly                     |
+| **Best for**        | Known requirements, repetitive patterns      | Exploration, complex decisions                   |
+| **Failure mode**    | Predictable (quality gate rejects)           | Unpredictable (context drift, hallucination)     |
+| **Token usage**     | High (fresh context per iteration)           | Moderate (continuous context)                    |
+| **Scalability**     | High (multiple agents on different features) | Low (one human can only guide one agent at once) |
+| **Audit trail**     | Complete (git + telemetry + time tracking)   | Incomplete (chat logs only)                      |
+| **Reproducibility** | High (same PRD → same result)                | Low (different conversation → different result)  |
 
-### Hybrid approach
+### Hybrid Approach (Recommended)
 
 Use interactive development to design and build the first iteration, then use PRD-driven autonomous development to replicate the pattern across multiple similar features.
 
-**Example:**
+**Example workflow:**
 
-- Iteration 1 (interactive): Build OAuth2 for Google — human guides every decision
-- Iteration 2+ (autonomous): Add GitHub, Microsoft, Twitter OAuth using the same pattern
+1. **Iteration 1 (interactive):** Build OAuth2 for Google
+   - Human guides architectural decisions
+   - Agent asks clarifying questions
+   - Human reviews each commit
+   - Establish patterns and conventions
+
+2. **Capture the pattern:** Document the approach in a PRD template
+   - What worked well (design decisions)
+   - What to avoid (gotchas discovered)
+   - Code patterns to follow
+   - Quality thresholds
+
+3. **Iterations 2+ (autonomous):** Add GitHub, Microsoft, Twitter OAuth
+   - Agent follows established patterns
+   - Quality gates enforce consistency
+   - Human reviews only at completion
+   - Parallelizable (multiple agents on different providers)
+
+**Result:** 4x faster delivery, consistent quality, human oversight where it matters.
+
+---
+
+## Troubleshooting
+
+### Agent Not Marking Subtasks Complete
+
+**Symptom:** Agent completes story but doesn't mark subtask as complete.
+
+**Check:**
+
+1. API endpoint format: `POST /api/tasks/{TASK_ID}/subtasks/{SUBTASK_ID}/complete`
+2. Subtask ID is correct (check `GET /api/tasks/{TASK_ID}` response)
+3. Authorization header is present
+
+**Fix:** Ensure agent has correct subtask ID from task fetch.
+
+### Quality Checks Failing Repeatedly
+
+**Symptom:** Agent retries same story 3+ times with same errors.
+
+**Check:**
+
+1. Error messages from quality checks
+2. Whether agent is reading error output
+3. Whether fixes are addressing root cause
+
+**Fix:** Improve agent prompt to parse error messages and make targeted fixes.
+
+### Progress File Not Growing
+
+**Symptom:** Progress file exists but has no entries after multiple iterations.
+
+**Check:**
+
+1. File path: `.veritas-kanban/progress.md`
+2. File permissions (agent can write)
+3. Agent prompt includes progress file update step
+
+**Fix:** Verify agent has write access and is executing Step 8 (update progress file).
+
+### Squad Chat Silent
+
+**Symptom:** Agent working but no Squad Chat messages.
+
+**Check:**
+
+1. Squad Chat endpoint: `POST http://localhost:3001/api/chat/squad`
+2. Authorization header
+3. Required fields: `agent`, `message`, `model`, `tags`
+
+**Fix:** Test Squad Chat endpoint manually, verify agent is posting at each major step.
+
+### Telemetry Missing
+
+**Symptom:** No telemetry events recorded for agent runs.
+
+**Check:**
+
+1. `run.started` event sent at beginning
+2. `run.completed` event sent at end
+3. `run.tokens` event sent with token counts
+
+**Fix:** Ensure agent emits all three telemetry events (see Execution Workflow).
+
+---
+
+## API Reference Summary
+
+Quick reference for agents executing PRD-driven workflows:
+
+| Endpoint                                        | Method | Purpose                         |
+| ----------------------------------------------- | ------ | ------------------------------- |
+| `/api/tasks/{id}`                               | GET    | Fetch task details and subtasks |
+| `/api/tasks/{id}/subtasks/{subtaskId}/complete` | POST   | Mark subtask complete           |
+| `/api/tasks/{id}/time/start`                    | POST   | Start time tracking             |
+| `/api/tasks/{id}/time/stop`                     | POST   | Stop time tracking              |
+| `/api/tasks/{id}/review`                        | POST   | Submit review scores            |
+| `/api/tasks/{id}/comments`                      | POST   | Add closing comment             |
+| `/api/tasks/{id}/complete`                      | POST   | Mark task complete              |
+| `/api/tasks/{id}`                               | PATCH  | Update task (e.g., set blocked) |
+| `/api/chat/squad`                               | POST   | Post to Squad Chat              |
+| `/api/telemetry/events`                         | POST   | Emit telemetry events           |
+| `/api/errors`                                   | POST   | Record error for learning       |
+
+**Full API documentation:** See [FEATURES.md](../FEATURES.md#api) for complete API reference.
 
 ---
 
