@@ -1,7 +1,7 @@
 # Veritas Kanban Workflow Engine — API Reference
 
-**Version**: v3.0  
-**Last Updated**: 2026-02-09  
+**Version**: v3.3  
+**Last Updated**: 2026-02-15  
 **Base URL**: `http://localhost:3001/api`
 
 ---
@@ -13,9 +13,13 @@
 3. [Workflow Runs](#workflow-runs)
 4. [Gate Operations](#gate-operations)
 5. [Tool Policies](#tool-policies)
-6. [WebSocket Events](#websocket-events)
-7. [TypeScript Interfaces](#typescript-interfaces)
-8. [Error Responses](#error-responses)
+6. [Task Dependencies](#task-dependencies) (NEW — v3.3)
+7. [Crash-Recovery Checkpointing](#crash-recovery-checkpointing) (NEW — v3.3)
+8. [Observational Memory](#observational-memory) (NEW — v3.3)
+9. [Agent Filter](#agent-filter) (NEW — v3.3)
+10. [WebSocket Events](#websocket-events)
+11. [TypeScript Interfaces](#typescript-interfaces)
+12. [Error Responses](#error-responses)
 
 ---
 
@@ -1063,6 +1067,489 @@ curl -X POST http://localhost:3001/api/tool-policies/planner/validate \
 - `404 Not Found` — Policy not found
 
 **Permissions**: Public.
+
+---
+
+## Task Dependencies
+
+### GET /api/tasks/:id/dependencies
+
+Get the full dependency graph for a task (recursive tree traversal).
+
+**Request**:
+
+```bash
+curl http://localhost:3001/api/tasks/US-42/dependencies
+```
+
+**Response**:
+
+```json
+{
+  "task": "US-42",
+  "depends_on": [
+    {
+      "id": "US-40",
+      "title": "Create database schema",
+      "status": "done",
+      "depends_on": []
+    },
+    {
+      "id": "US-41",
+      "title": "Implement auth middleware",
+      "status": "in-progress",
+      "depends_on": [
+        {
+          "id": "US-39",
+          "title": "Setup JWT library",
+          "status": "done",
+          "depends_on": []
+        }
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": "US-43",
+      "title": "Add user permissions",
+      "status": "todo",
+      "blocks": []
+    }
+  ]
+}
+```
+
+**Status Codes**:
+
+- `200 OK` — Success
+- `404 Not Found` — Task not found
+- `400 Bad Request` — Circular dependency detected
+
+**Notes**:
+
+- Returns recursive tree with all upstream (depends_on) and downstream (blocks) dependencies
+- Cycle detection prevents infinite loops
+- Batch-loaded for performance (no N+1 queries)
+
+---
+
+### POST /api/tasks/:id/dependencies
+
+Add a dependency to a task.
+
+**Request**:
+
+```bash
+curl -X POST http://localhost:3001/api/tasks/US-42/dependencies \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dependsOn": "US-40",
+    "direction": "depends_on"
+  }'
+```
+
+**Request Body**:
+
+```typescript
+{
+  dependsOn: string; // Required: task ID of the dependency
+  direction: 'depends_on' | 'blocks'; // Required: direction of dependency
+}
+```
+
+**Status Codes**:
+
+- `200 OK` — Dependency added
+- `400 Bad Request` — Would create circular dependency
+- `404 Not Found` — Task not found
+
+**Notes**:
+
+- `depends_on`: This task depends on the specified task
+- `blocks`: This task blocks the specified task
+- Validates for cycles before adding
+
+---
+
+### DELETE /api/tasks/:id/dependencies/:dependencyId
+
+Remove a dependency from a task.
+
+**Request**:
+
+```bash
+curl -X DELETE http://localhost:3001/api/tasks/US-42/dependencies/US-40?direction=depends_on
+```
+
+**Query Parameters**:
+
+- `direction` (required): `depends_on` or `blocks`
+
+**Status Codes**:
+
+- `200 OK` — Dependency removed
+- `404 Not Found` — Task or dependency not found
+
+---
+
+## Crash-Recovery Checkpointing
+
+### POST /api/tasks/:id/checkpoint
+
+Save checkpoint state for a task.
+
+**Request**:
+
+```bash
+curl -X POST http://localhost:3001/api/tasks/US-42/checkpoint \
+  -H "Content-Type: application/json" \
+  -d '{
+    "state": {
+      "current_step": 3,
+      "completed": ["step1", "step2"],
+      "api_key": "sk-1234567890",
+      "context": "Working on user authentication"
+    }
+  }'
+```
+
+**Request Body**:
+
+```typescript
+{
+  state: any; // Required: checkpoint state (auto-sanitized for secrets)
+}
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "checkpoint": {
+    "taskId": "US-42",
+    "state": {
+      "current_step": 3,
+      "completed": ["step1", "step2"],
+      "api_key": "[REDACTED]",
+      "context": "Working on user authentication"
+    },
+    "createdAt": "2026-02-15T12:00:00Z",
+    "expiresAt": "2026-02-16T12:00:00Z",
+    "resumeCount": 0
+  }
+}
+```
+
+**Status Codes**:
+
+- `200 OK` — Checkpoint saved
+- `400 Bad Request` — State exceeds 1MB limit
+- `404 Not Found` — Task not found
+
+**Notes**:
+
+- Auto-sanitizes 20+ secret patterns (API keys, tokens, passwords, etc.)
+- 1MB size limit enforced
+- 24h expiry with automatic cleanup
+- Secrets are sanitized in response but preserved in file for resume
+
+---
+
+### GET /api/tasks/:id/checkpoint
+
+Resume checkpoint state for a task.
+
+**Request**:
+
+```bash
+curl http://localhost:3001/api/tasks/US-42/checkpoint
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "checkpoint": {
+    "taskId": "US-42",
+    "state": {
+      "current_step": 3,
+      "completed": ["step1", "step2"],
+      "api_key": "[REDACTED]",
+      "context": "Working on user authentication"
+    },
+    "createdAt": "2026-02-15T12:00:00Z",
+    "expiresAt": "2026-02-16T12:00:00Z",
+    "resumeCount": 1
+  }
+}
+```
+
+**Status Codes**:
+
+- `200 OK` — Checkpoint retrieved (increments resumeCount)
+- `404 Not Found` — Task or checkpoint not found
+- `410 Gone` — Checkpoint expired
+
+**Notes**:
+
+- Each GET increments the resumeCount
+- Secrets are sanitized in response
+- Use for sub-agent context injection
+
+---
+
+### DELETE /api/tasks/:id/checkpoint
+
+Clear checkpoint state for a task.
+
+**Request**:
+
+```bash
+curl -X DELETE http://localhost:3001/api/tasks/US-42/checkpoint
+```
+
+**Status Codes**:
+
+- `200 OK` — Checkpoint cleared
+- `404 Not Found` — Task or checkpoint not found
+
+---
+
+## Observational Memory
+
+### POST /api/observations
+
+Add an observation to a task.
+
+**Request**:
+
+```bash
+curl -X POST http://localhost:3001/api/observations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "taskId": "US-42",
+    "type": "decision",
+    "content": "Chose React Query over Redux for simpler data fetching and better caching",
+    "importance": 8
+  }'
+```
+
+**Request Body**:
+
+```typescript
+{
+  taskId: string; // Required: task ID
+  type: 'decision' | 'blocker' | 'insight' | 'context'; // Required
+  content: string; // Required: observation text (XSS-sanitized)
+  importance: number; // Required: 1-10 (1-3: low, 4-7: medium, 8-10: high)
+}
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "observation": {
+    "id": "obs_abc123",
+    "taskId": "US-42",
+    "type": "decision",
+    "content": "Chose React Query over Redux for simpler data fetching and better caching",
+    "importance": 8,
+    "createdAt": "2026-02-15T12:00:00Z",
+    "createdBy": "veritas"
+  }
+}
+```
+
+**Status Codes**:
+
+- `201 Created` — Observation added
+- `400 Bad Request` — Invalid type or importance score
+- `404 Not Found` — Task not found
+
+**Notes**:
+
+- Content is XSS-sanitized (strips script tags, dangerous attributes)
+- Activity log entry created automatically
+
+---
+
+### GET /api/tasks/:id/observations
+
+Get all observations for a task.
+
+**Request**:
+
+```bash
+curl http://localhost:3001/api/tasks/US-42/observations
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "observations": [
+    {
+      "id": "obs_abc123",
+      "taskId": "US-42",
+      "type": "decision",
+      "content": "Chose React Query over Redux",
+      "importance": 8,
+      "createdAt": "2026-02-15T12:00:00Z",
+      "createdBy": "veritas"
+    },
+    {
+      "id": "obs_def456",
+      "taskId": "US-42",
+      "type": "blocker",
+      "content": "Waiting on API key from ops team",
+      "importance": 6,
+      "createdAt": "2026-02-15T13:00:00Z",
+      "createdBy": "codex"
+    }
+  ]
+}
+```
+
+**Status Codes**:
+
+- `200 OK` — Success
+- `404 Not Found` — Task not found
+
+---
+
+### GET /api/observations/search
+
+Full-text search across all observations for all tasks.
+
+**Request**:
+
+```bash
+curl "http://localhost:3001/api/observations/search?query=react+query&limit=10&offset=0"
+```
+
+**Query Parameters**:
+
+- `query` (required): search terms (full-text search)
+- `limit` (optional): max results per page (default: 50, max: 200)
+- `offset` (optional): pagination offset (default: 0)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "id": "obs_abc123",
+      "taskId": "US-42",
+      "taskTitle": "Implement user authentication",
+      "type": "decision",
+      "content": "Chose React Query over Redux for simpler data fetching",
+      "importance": 8,
+      "createdAt": "2026-02-15T12:00:00Z",
+      "createdBy": "veritas"
+    }
+  ],
+  "total": 1,
+  "limit": 10,
+  "offset": 0
+}
+```
+
+**Status Codes**:
+
+- `200 OK` — Success
+- `400 Bad Request` — Missing query or invalid limit/offset
+
+**Notes**:
+
+- Searches across all tasks
+- Results include task title for context
+- Max 200 results per page
+
+---
+
+### DELETE /api/observations/:id
+
+Delete an observation.
+
+**Request**:
+
+```bash
+curl -X DELETE http://localhost:3001/api/observations/obs_abc123
+```
+
+**Status Codes**:
+
+- `200 OK` — Observation deleted
+- `404 Not Found` — Observation not found
+
+**Notes**:
+
+- Activity log entry created automatically
+
+---
+
+## Agent Filter
+
+### GET /api/tasks?agent=:name
+
+Filter tasks by assigned agent name.
+
+**Request**:
+
+```bash
+curl "http://localhost:3001/api/tasks?agent=codex"
+```
+
+**Query Parameters**:
+
+- `agent` (optional): agent name (trimmed, max 100 chars)
+- `status` (optional): filter by status (todo, in-progress, blocked, done)
+- `limit` (optional): max results (default: 100)
+- `offset` (optional): pagination offset (default: 0)
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "tasks": [
+    {
+      "id": "US-42",
+      "title": "Implement user authentication",
+      "status": "in-progress",
+      "agents": ["codex"],
+      "priority": "high",
+      "type": "feature"
+    },
+    {
+      "id": "US-45",
+      "title": "Add input validation",
+      "status": "todo",
+      "agents": ["codex", "veritas"],
+      "priority": "medium",
+      "type": "code"
+    }
+  ],
+  "total": 2
+}
+```
+
+**Status Codes**:
+
+- `200 OK` — Success
+
+**Notes**:
+
+- Agent name is case-insensitive and trimmed
+- Works with existing pagination and filters
+- Returns tasks where the agent is in the `agents[]` array
 
 ---
 

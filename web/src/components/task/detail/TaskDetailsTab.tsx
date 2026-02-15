@@ -123,6 +123,55 @@ export function TaskDetailsTab({
         </div>
       )}
 
+      {/* Checkpoint Status (shown when checkpoint exists) */}
+      {task.checkpoint && (
+        <div className="border-t pt-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-muted-foreground">Checkpoint</Label>
+              {!readOnly && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Clear checkpoint and discard saved progress"
+                  onClick={async () => {
+                    try {
+                      await fetch(`/api/tasks/${task.id}/checkpoint`, { method: 'DELETE' });
+                      onUpdate('checkpoint', undefined);
+                    } catch (error) {
+                      console.error('Failed to clear checkpoint:', error);
+                    }
+                  }}
+                >
+                  Clear Checkpoint
+                </Button>
+              )}
+            </div>
+            <div
+              role="status"
+              aria-live="polite"
+              className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md p-3 space-y-2"
+            >
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100 text-xs font-medium">
+                  💾 CHECKPOINT SAVED
+                </span>
+                <span className="text-xs text-muted-foreground">Step {task.checkpoint.step}</span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Saved: {formatDate(task.checkpoint.timestamp)}
+              </div>
+              {task.checkpoint.resumeCount && task.checkpoint.resumeCount > 0 && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <RotateCcw className="h-3 w-3" />
+                  <span>Resumed {task.checkpoint.resumeCount} time(s)</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Subtasks */}
       <div className="border-t pt-4">
         <SubtasksSection

@@ -252,6 +252,63 @@ export class TaskService {
     log.debug({ hits: this.cacheStats.hits, misses: this.cacheStats.misses }, 'Cache disposed');
   }
 
+  /**
+   * Clean up expired checkpoints (older than 24 hours).
+   * This should be called periodically (e.g., on service startup or via a scheduled task).
+   */
+  /**
+   * Cleanup expired checkpoints (older than 24 hours).
+   * O(N) iteration over all tasks — acceptable for expected scale (hundreds of tasks).
+   * Future optimization: add checkpoint index to data/checkpoints.json for O(1) lookup.
+   */
+  async cleanupExpiredCheckpoints(): Promise<{ cleaned: number; errors: number }> {
+    await this.initCache();
+    const tasks = this.cacheList();
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    const now = Date.now();
+    let cleaned = 0;
+    let errors = 0;
+
+    for (const task of tasks) {
+      if (!task.checkpoint) continue;
+
+      const checkpointTime = new Date(task.checkpoint.timestamp).getTime();
+
+      // Handle invalid timestamps
+      if (isNaN(checkpointTime)) {
+        try {
+          await this.updateTask(task.id, { checkpoint: undefined });
+          cleaned++;
+          log.debug({ taskId: task.id }, 'Cleared checkpoint with invalid timestamp');
+        } catch (err) {
+          errors++;
+          log.error({ err, taskId: task.id }, 'Failed to clear invalid checkpoint');
+        }
+        continue;
+      }
+
+      const age = now - checkpointTime;
+
+      if (age > maxAge) {
+        try {
+          // Clear the expired checkpoint
+          await this.updateTask(task.id, { checkpoint: undefined });
+          cleaned++;
+          log.debug({ taskId: task.id, age }, 'Cleared expired checkpoint');
+        } catch (err) {
+          errors++;
+          log.error({ err, taskId: task.id }, 'Failed to clear expired checkpoint');
+        }
+      }
+    }
+
+    if (cleaned > 0 || errors > 0) {
+      log.info({ cleaned, errors }, 'Checkpoint cleanup completed');
+    }
+
+    return { cleaned, errors };
+  }
+
   private async ensureDirectories(): Promise<void> {
     await fs.mkdir(this.tasksDir, { recursive: true });
     await fs.mkdir(this.archiveDir, { recursive: true });
@@ -376,10 +433,15 @@ export class TaskService {
         automation: data.automation,
         timeTracking: data.timeTracking,
         comments: data.comments,
+        observations: data.observations,
         attachments: data.attachments,
         position: data.position,
         lessonsLearned: data.lessonsLearned,
         lessonTags: data.lessonTags,
+        checkpoint: data.checkpoint,
+        verificationSteps: data.verificationSteps,
+        deliverables: data.deliverables,
+        dependencies: data.dependencies,
       };
     } catch (error) {
       log.error({ err: error, filename }, 'Failed to parse task file');
@@ -610,6 +672,26 @@ export class TaskService {
         }
       }
 
+      // Handle checkpoint resumption: increment resumeCount if transitioning to in-progress with checkpoint
+      let checkpointUpdate = input.checkpoint;
+      if (
+        !checkpointUpdate &&
+        freshTask.checkpoint &&
+        input.status === 'in-progress' &&
+        previousStatus !== 'in-progress'
+      ) {
+        // Task is being resumed — increment resumeCount
+        checkpointUpdate = {
+          ...freshTask.checkpoint,
+          resumeCount: (freshTask.checkpoint.resumeCount || 0) + 1,
+        };
+      }
+
+      // Clear checkpoint when task completes successfully
+      if (input.status === 'done' && freshTask.checkpoint) {
+        checkpointUpdate = undefined;
+      }
+
       updatedTask = {
         ...freshTask,
         ...restInput,
@@ -620,6 +702,8 @@ export class TaskService {
           blockedReasonUpdate === null
             ? undefined
             : (blockedReasonUpdate ?? freshTask.blockedReason),
+        // Apply checkpoint update (resume count or clear)
+        checkpoint: checkpointUpdate !== undefined ? checkpointUpdate : freshTask.checkpoint,
         updated: new Date().toISOString(),
       };
 
@@ -1097,6 +1181,302 @@ export class TaskService {
     };
 
     return this.updateTask(taskId, { timeTracking }) as Promise<Task>;
+  }
+
+  /**
+   * Add a dependency relationship between two tasks
+   * @param taskId - The task that will depend on or block another
+   * @param targetId - The task to depend on or to block
+   * @param type - 'depends_on' or 'blocks'
+   */
+  async addDependency(
+    taskId: string,
+    targetId: string,
+    type: 'depends_on' | 'blocks'
+  ): Promise<Task> {
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new NotFoundError(`Task ${taskId} not found`);
+    }
+
+    const targetTask = await this.getTask(targetId);
+    if (!targetTask) {
+      throw new NotFoundError(`Target task ${targetId} not found`);
+    }
+
+    // Initialize dependencies if needed
+    const dependencies = task.dependencies || { depends_on: [], blocks: [] };
+    const targetDependencies = targetTask.dependencies || { depends_on: [], blocks: [] };
+
+    // Check for cycle BEFORE any updates
+    if (type === 'depends_on') {
+      // If we're adding A depends_on B, check if B (or its ancestors) already depend on A
+      const hasCycle = await this.checkForCycle(targetId, taskId);
+      if (hasCycle) {
+        throw new ValidationError('Adding this dependency would create a cycle');
+      }
+    } else {
+      // If we're adding A blocks B, check if A (or its ancestors) already depend on B
+      const hasCycle = await this.checkForCycle(taskId, targetId);
+      if (hasCycle) {
+        throw new ValidationError('Adding this dependency would create a cycle');
+      }
+    }
+
+    // Add the forward relationship
+    if (type === 'depends_on') {
+      if (!dependencies.depends_on) dependencies.depends_on = [];
+      if (!dependencies.depends_on.includes(targetId)) {
+        dependencies.depends_on.push(targetId);
+      }
+    } else {
+      if (!dependencies.blocks) dependencies.blocks = [];
+      if (!dependencies.blocks.includes(targetId)) {
+        dependencies.blocks.push(targetId);
+      }
+    }
+
+    // Add the reverse relationship
+    const reverseType = type === 'depends_on' ? 'blocks' : 'depends_on';
+    if (reverseType === 'depends_on') {
+      if (!targetDependencies.depends_on) targetDependencies.depends_on = [];
+      if (!targetDependencies.depends_on.includes(taskId)) {
+        targetDependencies.depends_on.push(taskId);
+      }
+    } else {
+      if (!targetDependencies.blocks) targetDependencies.blocks = [];
+      if (!targetDependencies.blocks.includes(taskId)) {
+        targetDependencies.blocks.push(taskId);
+      }
+    }
+
+    // Update both tasks inside file locks to prevent race conditions
+    // Update target first, then the task itself
+    await this.updateTask(targetId, { dependencies: targetDependencies });
+
+    // Re-check for cycle immediately before final write (race condition mitigation)
+    // This catches the case where another request added a conflicting dependency
+    // between our initial check and now
+    const finalCycleCheck =
+      type === 'depends_on'
+        ? await this.checkForCycle(targetId, taskId)
+        : await this.checkForCycle(taskId, targetId);
+
+    if (finalCycleCheck) {
+      // Rollback the target task update
+      await this.updateTask(targetId, { dependencies: targetTask.dependencies });
+      throw new ValidationError(
+        'Adding this dependency would create a cycle (detected during final check)'
+      );
+    }
+
+    return (await this.updateTask(taskId, { dependencies })) as Task;
+  }
+
+  /**
+   * Remove a dependency relationship between two tasks
+   * Detects which relationship exists and removes it correctly
+   */
+  async removeDependency(taskId: string, targetId: string): Promise<Task> {
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new NotFoundError(`Task ${taskId} not found`);
+    }
+
+    const targetTask = await this.getTask(targetId);
+    if (!targetTask) {
+      throw new NotFoundError(`Target task ${targetId} not found`);
+    }
+
+    const dependencies = task.dependencies || { depends_on: [], blocks: [] };
+    const targetDependencies = targetTask.dependencies || { depends_on: [], blocks: [] };
+
+    // Detect which relationship exists
+    const taskDependsOnTarget = dependencies.depends_on?.includes(targetId);
+    const taskBlocksTarget = dependencies.blocks?.includes(targetId);
+
+    if (!taskDependsOnTarget && !taskBlocksTarget) {
+      // No relationship exists
+      return task;
+    }
+
+    // Remove from the correct arrays only
+    if (taskDependsOnTarget) {
+      // Task depends_on target → remove from task.depends_on and target.blocks
+      dependencies.depends_on = dependencies.depends_on?.filter((id) => id !== targetId) || [];
+      targetDependencies.blocks = targetDependencies.blocks?.filter((id) => id !== taskId) || [];
+    }
+
+    if (taskBlocksTarget) {
+      // Task blocks target → remove from task.blocks and target.depends_on
+      dependencies.blocks = dependencies.blocks?.filter((id) => id !== targetId) || [];
+      targetDependencies.depends_on =
+        targetDependencies.depends_on?.filter((id) => id !== taskId) || [];
+    }
+
+    // Update both tasks
+    await this.updateTask(targetId, { dependencies: targetDependencies });
+    return (await this.updateTask(taskId, { dependencies })) as Task;
+  }
+
+  /**
+   * Check if adding a dependency would create a cycle
+   * Performs DFS to detect cycles, traversing BOTH depends_on and blocks relationships
+   * Uses batch loading to avoid N+1 queries
+   */
+  private async checkForCycle(startId: string, targetId: string): Promise<boolean> {
+    // Load all tasks once for batch processing (performance optimization)
+    const allTasks = await this.listTasks();
+    const taskMap = new Map(allTasks.map((t) => [t.id, t]));
+
+    const visited = new Set<string>();
+    const stack = [startId];
+
+    while (stack.length > 0) {
+      const currentId = stack.pop()!;
+
+      if (currentId === targetId) {
+        return true; // Found a cycle
+      }
+
+      if (visited.has(currentId)) {
+        continue;
+      }
+
+      visited.add(currentId);
+
+      // Get task from in-memory map (no disk I/O)
+      const currentTask = taskMap.get(currentId);
+      if (!currentTask?.dependencies) {
+        continue;
+      }
+
+      // Traverse BOTH depends_on and blocks relationships
+      // A cycle can occur through either relationship type
+      const nextIds = [
+        ...(currentTask.dependencies.depends_on || []),
+        ...(currentTask.dependencies.blocks || []),
+      ];
+
+      for (const nextId of nextIds) {
+        if (!visited.has(nextId)) {
+          stack.push(nextId);
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Get all dependencies for a task (both directions)
+   * Uses batch loading to avoid N+1 queries
+   */
+  async getTaskDependencies(taskId: string): Promise<{
+    depends_on: Task[];
+    blocks: Task[];
+  }> {
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new NotFoundError(`Task ${taskId} not found`);
+    }
+
+    // Batch load all tasks once
+    const allTasks = await this.listTasks();
+    const taskMap = new Map(allTasks.map((t) => [t.id, t]));
+
+    const dependsOnIds = task.dependencies?.depends_on || [];
+    const blocksIds = task.dependencies?.blocks || [];
+
+    // Resolve from in-memory map (no disk I/O)
+    const dependsOn = dependsOnIds
+      .map((id) => taskMap.get(id))
+      .filter((t): t is Task => t !== undefined);
+
+    const blocks = blocksIds.map((id) => taskMap.get(id)).filter((t): t is Task => t !== undefined);
+
+    return {
+      depends_on: dependsOn,
+      blocks: blocks,
+    };
+  }
+
+  /**
+   * Get the full dependency graph for a task (recursive)
+   * Returns a tree structure showing all upstream and downstream dependencies
+   * Uses batch loading to avoid N+1 queries
+   */
+  async getTaskDependencyGraph(taskId: string): Promise<{
+    task: Task;
+    upstream: any[];
+    downstream: any[];
+  }> {
+    const task = await this.getTask(taskId);
+    if (!task) {
+      throw new NotFoundError(`Task ${taskId} not found`);
+    }
+
+    // Batch load all tasks once for performance
+    const allTasks = await this.listTasks();
+    const taskMap = new Map(allTasks.map((t) => [t.id, t]));
+
+    const buildUpstream = (id: string, visited: Set<string>, depth = 0): any[] => {
+      if (visited.has(id) || depth > 10) return [];
+      visited.add(id);
+
+      const t = taskMap.get(id);
+      if (!t) return [];
+
+      const dependsOnIds = t.dependencies?.depends_on || [];
+      const children = dependsOnIds
+        .map((depId) => {
+          const depTask = taskMap.get(depId);
+          if (!depTask) return null;
+          return {
+            task: depTask,
+            children: buildUpstream(depId, visited, depth + 1),
+          };
+        })
+        .filter((c): c is any => c !== null);
+
+      return children;
+    };
+
+    const buildDownstream = (id: string, visited: Set<string>, depth = 0): any[] => {
+      // Add visited set to prevent diamond-dependency exponential blowup
+      if (visited.has(id) || depth > 10) return [];
+      visited.add(id);
+
+      const t = taskMap.get(id);
+      if (!t) return [];
+
+      const blocksIds = t.dependencies?.blocks || [];
+      const children = blocksIds
+        .map((blockId) => {
+          const blockTask = taskMap.get(blockId);
+          if (!blockTask) return null;
+          return {
+            task: blockTask,
+            children: buildDownstream(blockId, visited, depth + 1),
+          };
+        })
+        .filter((c): c is any => c !== null);
+
+      return children;
+    };
+
+    // Use separate visited sets for upstream and downstream traversal
+    const upstreamVisited = new Set<string>();
+    const downstreamVisited = new Set<string>();
+
+    const upstream = buildUpstream(taskId, upstreamVisited);
+    const downstream = buildDownstream(taskId, downstreamVisited);
+
+    return {
+      task,
+      upstream,
+      downstream,
+    };
   }
 
   /**

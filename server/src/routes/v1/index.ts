@@ -22,6 +22,7 @@ import { taskArchiveRoutes } from '../task-archive.js';
 import { taskTimeRoutes } from '../task-time.js';
 import { taskRoutes } from '../tasks.js';
 import { taskCommentRoutes } from '../task-comments.js';
+import { taskObservationRoutes, observationSearchRouter } from '../task-observations.js';
 import { taskSubtaskRoutes } from '../task-subtasks.js';
 import { taskVerificationRoutes } from '../task-verification.js';
 import { taskDeliverableRoutes } from '../task-deliverables.js';
@@ -90,6 +91,7 @@ v1Router.use('/tasks', taskArchiveRoutes);
 v1Router.use('/tasks', taskTimeRoutes);
 v1Router.use('/tasks', taskRoutes);
 v1Router.use('/tasks', taskCommentRoutes);
+v1Router.use('/tasks', taskObservationRoutes);
 v1Router.use('/tasks', taskSubtaskRoutes);
 v1Router.use('/tasks', taskVerificationRoutes);
 v1Router.use('/tasks', taskDeliverableRoutes);
@@ -110,6 +112,9 @@ v1Router.use(
 
 // ── Backlog routes ───────────────────────────────────────────
 v1Router.use('/backlog', backlogRoutes);
+
+// ── Observation search ───────────────────────────────────────
+v1Router.use('/observations', observationSearchRouter);
 
 // ── Feature routes ───────────────────────────────────────────
 v1Router.use('/config', configRoutes);

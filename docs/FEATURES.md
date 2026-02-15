@@ -95,17 +95,29 @@ The Kanban board is the central interface — a drag-and-drop workspace that ref
 
 ## Subtasks & Dependencies
 
-Break down complex work and manage task ordering.
+Break down complex work and manage task ordering with bidirectional dependency graphs.
+
+### Subtasks
 
 - **Subtask creation** — Add subtasks inline with Enter-to-submit
 - **Progress tracking** — Visual progress bar on task cards showing completion ratio (e.g., "3/5")
 - **Toggle completion** — Check/uncheck subtasks with immediate save
 - **Auto-complete** — Optional: automatically mark parent task as done when all subtasks complete
 - **Delete subtasks** — Remove individual subtasks
-- **Dependency blocking** — Add other tasks as blockers via a dependency picker
+
+### Task Dependencies (v3.3.0)
+
+- **Bidirectional dependency model** — Tasks can both depend_on other tasks and block other tasks
+- **Cycle detection** — DFS algorithm traverses both directions to prevent circular dependency loops
+- **Dependency graph API** — `GET /api/tasks/:id/dependencies` returns recursive tree with all upstream and downstream dependencies
+- **DependenciesSection UI** — Add/remove dependencies for both directions (depends_on/blocks) with visual feedback
+- **TaskCard dependency badges** — Shows count of dependencies and blocked tasks on each card
+- **Zod validation** — Input validation on all dependency routes
+- **Batch-loaded traversal** — Eliminated N+1 queries with efficient graph traversal
+- **Full accessibility** — Keyboard navigation + ARIA labels throughout dependency UI
 - **Block status detection** — Tasks with incomplete blockers show a blocked indicator on their card
 - **Blocker status display** — See whether each blocker is done (green) or still pending (blocked icon)
-- **Dependency removal** — Remove blockers individually
+- **Dependency removal** — Remove blockers individually from either direction
 
 ---
 
@@ -227,6 +239,112 @@ Transform product requirements into working code through iterative, quality-gate
 **Avoid for:** Vague requirements, exploratory work, complex architectural decisions, high-risk changes (migrations, auth), research tasks
 
 → [Full guide](features/prd-driven-development.md) — setup, agent execution workflow, complete OAuth2 example walkthrough, configuration tips, troubleshooting
+
+---
+
+## Crash-Recovery Checkpointing (v3.3.0)
+
+Save and resume agent state across crashes and restarts with automatic secret sanitization.
+
+- **Save/resume/clear API** — `POST /api/tasks/:id/checkpoint` (save), `GET /api/tasks/:id/checkpoint` (resume), `DELETE /api/tasks/:id/checkpoint` (clear)
+- **Auto-sanitization of secrets** — Detects and sanitizes 20+ key patterns (API keys, tokens, passwords, etc.) plus regex value detection
+- **1MB size limit** — Prevents checkpoint bloat; server rejects payloads exceeding 1MB
+- **24h expiry** — Automatic cleanup of stale checkpoints after 24 hours
+- **Resume counter** — Tracks restart attempts to prevent infinite loops
+- **Sub-agent context injection** — Checkpoint state automatically injected into sub-agent prompts on resume
+- **Array sanitization** — Handles nested objects and primitive strings within arrays
+- **NaN timestamp handling** — Converts NaN timestamps to null for proper serialization
+- **ARIA-accessible UI** — Checkpoint controls in TaskCard and TaskDetailPanel with full keyboard navigation
+
+**Use cases:**
+
+- Agent crashes mid-execution → resume from last checkpoint
+- Server restart during long-running task → restore agent context
+- Iterative workflows → preserve state between steps
+
+**Example:**
+
+```bash
+# Save checkpoint
+curl -X POST http://localhost:3001/api/tasks/US-42/checkpoint \
+  -H "Content-Type: application/json" \
+  -d '{"state":{"current_step":3,"completed":["step1","step2"],"api_key":"sk-1234"}}'
+
+# Resume checkpoint (secrets sanitized in response)
+curl http://localhost:3001/api/tasks/US-42/checkpoint
+# Returns: {"state":{"current_step":3,"completed":["step1","step2"],"api_key":"[REDACTED]"},...}
+
+# Clear checkpoint
+curl -X DELETE http://localhost:3001/api/tasks/US-42/checkpoint
+```
+
+---
+
+## Observational Memory (v3.3.0)
+
+Capture and search critical insights, decisions, blockers, and context across agent workflows.
+
+- **Add/view/delete observations** — `POST /api/observations`, `GET /api/tasks/:id/observations`, `DELETE /api/observations/:id`
+- **Four observation types** — decision, blocker, insight, context with color-coded badges
+- **Importance scoring** — Rate observations 1-10 with visual badges (1-3: low, 4-7: medium, 8-10: high)
+- **Full-text search** — `GET /api/observations/search?query=...` searches across all observations for all tasks
+- **Paginated results** — Search supports limit/offset with max 200 results per page
+- **Timeline view** — Chronological display with type-colored badges and importance indicators
+- **Activity logging** — All observation changes logged to activity feed for audit trail
+- **XSS prevention** — `sanitizeCommentText()` strips script tags and dangerous attributes
+- **ARIA-accessible UI** — Range slider for importance, decorative icons properly labeled
+
+**Use cases:**
+
+- Agent makes architectural decision → log as "decision" observation
+- Blocked by external dependency → log as "blocker" observation
+- Learns better approach → log as "insight" observation
+- Needs context for future work → log as "context" observation
+
+**Example:**
+
+```bash
+# Add observation
+curl -X POST http://localhost:3001/api/observations \
+  -H "Content-Type: application/json" \
+  -d '{"taskId":"US-42","type":"decision","content":"Chose React Query over Redux for simpler data fetching","importance":8}'
+
+# Search across all tasks
+curl "http://localhost:3001/api/observations/search?query=react+query&limit=10"
+
+# Get observations for task
+curl http://localhost:3001/api/tasks/US-42/observations
+```
+
+---
+
+## Agent Filter (v3.3.0)
+
+Query tasks by agent name for precise agent workload tracking.
+
+- **Query parameter** — `GET /api/tasks?agent=name` filters tasks assigned to specific agent
+- **Input sanitization** — Agent name trimmed and capped at 100 characters
+- **Pagination compatible** — Works with existing `limit`, `offset`, `status` filters
+- **JSDoc/OpenAPI documented** — Full API documentation in server code
+
+**Use cases:**
+
+- Check what tasks are assigned to "codex" → `GET /api/tasks?agent=codex`
+- Find all "veritas" tasks in "blocked" status → `GET /api/tasks?agent=veritas&status=blocked`
+- Agent workload reporting → query by agent name for analytics
+
+**Example:**
+
+```bash
+# Get all tasks for agent "codex"
+curl "http://localhost:3001/api/tasks?agent=codex"
+
+# Get blocked tasks for agent "veritas"
+curl "http://localhost:3001/api/tasks?agent=veritas&status=blocked"
+
+# Paginated results
+curl "http://localhost:3001/api/tasks?agent=codex&limit=25&offset=0"
+```
 
 ---
 

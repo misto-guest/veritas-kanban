@@ -198,6 +198,33 @@ export const tasksApi = {
     return handleResponse<Task>(response);
   },
 
+  // Observations
+  addObservation: async (
+    taskId: string,
+    data: {
+      type: 'decision' | 'blocker' | 'insight' | 'context';
+      content: string;
+      score?: number;
+      agent?: string;
+    }
+  ): Promise<Task> => {
+    const response = await fetch(`${API_BASE}/tasks/${taskId}/observations`, {
+      credentials: 'include',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<Task>(response);
+  },
+
+  deleteObservation: async (taskId: string, observationId: string): Promise<Task> => {
+    const response = await fetch(`${API_BASE}/tasks/${taskId}/observations/${observationId}`, {
+      credentials: 'include',
+      method: 'DELETE',
+    });
+    return handleResponse<Task>(response);
+  },
+
   // Deliverables
   addDeliverable: async (
     taskId: string,

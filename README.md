@@ -10,7 +10,7 @@ Built for developers who want a visual Kanban board that works with autonomous c
 
 [![CI](https://github.com/BradGroux/veritas-kanban/actions/workflows/ci.yml/badge.svg)](https://github.com/BradGroux/veritas-kanban/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.2.1-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -202,7 +202,10 @@ All gates are toggleable via `PATCH /api/settings/features` under the `enforceme
 > 🎬 [Watch the task workflow demo (MP4)](assets/demo-task.mp4)
 
 - **Subtasks** — Break down complex work with progress tracking
-- **Dependencies** — Block tasks until prerequisites complete
+- **Task dependencies** — Bidirectional dependency graph (depends_on/blocks) with cycle detection, recursive tree API, and visual badges (NEW — v3.3)
+- **Crash-recovery checkpointing** — Save/resume/clear agent state with auto-sanitization of secrets, 1MB limit, 24h expiry, and sub-agent context injection (NEW — v3.3)
+- **Observational memory** — Per-task observations with importance scoring (1-10), full-text search, timeline view, and activity logging (NEW — v3.3)
+- **Agent filter** — Query tasks by agent name with `?agent=name` parameter (NEW — v3.3)
 - **Archive** — Searchable archive with one-click restore
 - **Time tracking** — Start/stop timer or manual entry
 - **Activity log** — Full history of task events

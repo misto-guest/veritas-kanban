@@ -70,6 +70,7 @@ export class BacklogRepository {
         automation: frontmatter.automation,
         timeTracking: frontmatter.timeTracking,
         comments: frontmatter.comments,
+        observations: frontmatter.observations,
         attachments: frontmatter.attachments,
         position: frontmatter.position,
       };

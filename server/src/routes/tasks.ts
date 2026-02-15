@@ -85,6 +85,20 @@ const applyTemplateSchema = z.object({
   fieldsChanged: z.array(z.string()).optional(),
 });
 
+// Task ID format validation (production: task_YYYYMMDD_XXXXXX)
+const taskIdSchema = z
+  .string()
+  .regex(/^task_(\d{8}_[a-zA-Z0-9_-]{1,20}|[a-zA-Z0-9_-]+)$/, 'Invalid task ID format');
+
+const addDependencySchema = z
+  .object({
+    depends_on: taskIdSchema.optional(),
+    blocks: taskIdSchema.optional(),
+  })
+  .refine((data) => (data.depends_on && !data.blocks) || (!data.depends_on && data.blocks), {
+    message: 'Must provide either depends_on or blocks (not both)',
+  });
+
 const blockedReasonSchema = z
   .object({
     category: z.enum(['waiting-on-feedback', 'technical-snag', 'prerequisite', 'other']),
@@ -183,6 +197,10 @@ const appendProgressSchema = z.object({
  *         schema: { type: string }
  *         description: Filter by project name (exact match)
  *       - in: query
+ *         name: agent
+ *         schema: { type: string }
+ *         description: Filter by agent name (exact match)
+ *       - in: query
  *         name: view
  *         schema: { type: string, enum: [summary] }
  *         description: '"summary" returns lightweight TaskSummary objects'
@@ -227,6 +245,10 @@ router.get(
     }
     if (projectFilter) {
       tasks = tasks.filter((t) => t.project === projectFilter);
+    }
+    const agentFilter = (req.query.agent as string | undefined)?.trim().slice(0, 100);
+    if (agentFilter) {
+      tasks = tasks.filter((t) => t.agent === agentFilter);
     }
 
     const total = tasks.length;
@@ -1096,6 +1118,121 @@ router.post(
   })
 );
 
+// === Dependency Routes ===
+
+/**
+ * POST /api/tasks/:id/dependencies - Add a dependency
+ * Body: { depends_on?: string, blocks?: string }
+ */
+router.post(
+  '/:id/dependencies',
+  asyncHandler(async (req, res) => {
+    const taskId = req.params.id as string;
+
+    // Validate request body with Zod
+    let input: { depends_on?: string; blocks?: string };
+    try {
+      input = addDependencySchema.parse(req.body);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new ValidationError('Validation failed', error.errors);
+      }
+      throw error;
+    }
+
+    const { depends_on, blocks } = input;
+    const targetId = depends_on || blocks;
+    const type: 'depends_on' | 'blocks' = depends_on ? 'depends_on' : 'blocks';
+
+    const task = await taskService.addDependency(taskId, targetId, type);
+
+    // Log activity
+    await activityService.logActivity(
+      'dependency_added',
+      task.id,
+      task.title,
+      { type, targetId },
+      task.agent
+    );
+
+    // Broadcast change
+    broadcastTaskChange('updated', taskId);
+
+    // Audit log
+    const authReq = req as AuthenticatedRequest;
+    await auditLog({
+      action: 'tasks.add_dependency',
+      actor: authReq.auth?.keyName || 'unknown',
+      resource: taskId,
+      details: { type, targetId },
+    });
+
+    setLastModified(res, task.updated);
+    res.json(task);
+  })
+);
+
+/**
+ * DELETE /api/tasks/:id/dependencies/:targetId - Remove a dependency
+ */
+router.delete(
+  '/:id/dependencies/:targetId',
+  asyncHandler(async (req, res) => {
+    const taskId = req.params.id as string;
+    const targetId = req.params.targetId as string;
+
+    const task = await taskService.removeDependency(taskId, targetId);
+
+    // Log activity
+    await activityService.logActivity(
+      'dependency_removed',
+      task.id,
+      task.title,
+      { targetId },
+      task.agent
+    );
+
+    // Broadcast change
+    broadcastTaskChange('updated', taskId);
+
+    // Audit log
+    const authReq = req as AuthenticatedRequest;
+    await auditLog({
+      action: 'tasks.remove_dependency',
+      actor: authReq.auth?.keyName || 'unknown',
+      resource: taskId,
+      details: { targetId },
+    });
+
+    setLastModified(res, task.updated);
+    res.json(task);
+  })
+);
+
+/**
+ * GET /api/tasks/:id/dependencies - Get all dependencies (both directions)
+ */
+router.get(
+  '/:id/dependencies',
+  asyncHandler(async (req, res) => {
+    const taskId = req.params.id as string;
+    const dependencies = await taskService.getTaskDependencies(taskId);
+    res.json(dependencies);
+  })
+);
+
+/**
+ * GET /api/tasks/:id/dependency-graph - Get full dependency tree (recursive)
+ */
+router.get(
+  '/:id/dependency-graph',
+  asyncHandler(async (req, res) => {
+    const taskId = req.params.id as string;
+    const graph = await taskService.getTaskDependencyGraph(taskId);
+    res.json(graph);
+  })
+);
+
 // === Progress Routes ===
 
 /**
@@ -1167,6 +1304,213 @@ router.post(
     }
 
     await progressService.appendProgress(taskId, input.section, input.content);
+
+    res.json({ success: true });
+  })
+);
+
+// === Checkpoint Routes ===
+
+/**
+ * Sanitize checkpoint state: remove any field containing sensitive keywords
+ * and redact values matching secret patterns
+ */
+function sanitizeCheckpointState(state: Record<string, any>): Record<string, any> {
+  const sensitiveKeys = [
+    'key',
+    'token',
+    'secret',
+    'password',
+    'apikey',
+    'api_key',
+    'bearer',
+    'auth',
+    'authorization',
+    'credential',
+    'private',
+    'jwt',
+    'session',
+    'cookie',
+    'oauth',
+    'client_secret',
+    'access_token',
+    'refresh_token',
+    'api_token',
+    'webhook',
+  ];
+
+  // Patterns for detecting secret-like values
+  const SECRET_VALUE_PATTERNS = [
+    /ghp_[a-zA-Z0-9]{36}/, // GitHub PAT
+    /sk-[a-zA-Z0-9-]{20,}/, // OpenAI key
+    /xox[a-z]-[0-9]+-/, // Slack token
+    /Bearer\s+[a-zA-Z0-9\-._~+/]+=*/i, // Bearer token
+    /[a-zA-Z0-9+/]{40,}={0,2}/, // Base64 tokens (40+ chars)
+  ];
+
+  const sanitized: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(state)) {
+    // Check if key contains any sensitive keyword (case-insensitive)
+    const keyLower = key.toLowerCase();
+    const isSensitive = sensitiveKeys.some((keyword) => keyLower.includes(keyword));
+
+    if (isSensitive) {
+      continue; // Skip sensitive fields
+    }
+
+    // Handle arrays: recursively sanitize each item (including primitive strings)
+    if (Array.isArray(value)) {
+      sanitized[key] = value.map((item) => {
+        if (item && typeof item === 'object') {
+          return sanitizeCheckpointState(item);
+        }
+        if (typeof item === 'string') {
+          const matchesSecretPattern = SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(item));
+          return matchesSecretPattern ? '[REDACTED]' : item;
+        }
+        return item;
+      });
+    }
+    // Recursively sanitize nested objects
+    else if (value && typeof value === 'object') {
+      sanitized[key] = sanitizeCheckpointState(value as Record<string, any>);
+    }
+    // Check string values for secret patterns
+    else if (typeof value === 'string') {
+      const matchesSecretPattern = SECRET_VALUE_PATTERNS.some((pattern) => pattern.test(value));
+      sanitized[key] = matchesSecretPattern ? '[REDACTED]' : value;
+    }
+    // Non-sensitive primitive values
+    else {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
+}
+
+const checkpointSchema = z
+  .object({
+    step: z.number().int().min(0),
+    state: z.record(z.any()),
+  })
+  .refine(
+    (data) => {
+      const stateStr = JSON.stringify(data.state);
+      return stateStr.length <= 1024 * 1024; // 1MB limit
+    },
+    {
+      message: 'Checkpoint state exceeds 1MB limit',
+    }
+  );
+
+/**
+ * POST /api/tasks/:id/checkpoint - Save checkpoint data
+ */
+router.post(
+  '/:id/checkpoint',
+  asyncHandler(async (req, res) => {
+    const taskId = req.params.id as string;
+    const task = await taskService.getTask(taskId);
+
+    if (!task) {
+      throw new NotFoundError('Task not found');
+    }
+
+    let input: { step: number; state: Record<string, any> };
+    try {
+      input = checkpointSchema.parse(req.body);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new ValidationError('Validation failed', error.errors);
+      }
+      throw error;
+    }
+
+    // Sanitize the state to remove secrets
+    const sanitizedState = sanitizeCheckpointState(input.state);
+
+    // Prepare checkpoint data
+    const checkpoint = {
+      step: input.step,
+      state: sanitizedState,
+      timestamp: new Date().toISOString(),
+      resumeCount: task.checkpoint?.resumeCount || 0,
+    };
+
+    // Update task with checkpoint
+    const updatedTask = await taskService.updateTask(taskId, { checkpoint });
+
+    // Broadcast change
+    broadcastTaskChange('updated', updatedTask);
+
+    res.json({ success: true, checkpoint });
+  })
+);
+
+/**
+ * GET /api/tasks/:id/checkpoint - Get latest checkpoint
+ */
+router.get(
+  '/:id/checkpoint',
+  asyncHandler(async (req, res) => {
+    const taskId = req.params.id as string;
+    const task = await taskService.getTask(taskId);
+
+    if (!task) {
+      throw new NotFoundError('Task not found');
+    }
+
+    if (!task.checkpoint) {
+      res.json({ checkpoint: null });
+      return;
+    }
+
+    // Check if checkpoint is expired (older than 24h)
+    const checkpointTime = new Date(task.checkpoint.timestamp).getTime();
+
+    // Handle invalid timestamps
+    if (isNaN(checkpointTime)) {
+      await taskService.updateTask(taskId, { checkpoint: undefined });
+      res.json({ checkpoint: null, invalid: true });
+      return;
+    }
+
+    const now = Date.now();
+    const age = now - checkpointTime;
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+    if (age > maxAge) {
+      // Clear expired checkpoint
+      await taskService.updateTask(taskId, { checkpoint: undefined });
+      broadcastTaskChange('updated', taskId);
+      res.json({ checkpoint: null, expired: true });
+      return;
+    }
+
+    res.json({ checkpoint: task.checkpoint });
+  })
+);
+
+/**
+ * DELETE /api/tasks/:id/checkpoint - Clear checkpoint
+ */
+router.delete(
+  '/:id/checkpoint',
+  asyncHandler(async (req, res) => {
+    const taskId = req.params.id as string;
+    const task = await taskService.getTask(taskId);
+
+    if (!task) {
+      throw new NotFoundError('Task not found');
+    }
+
+    // Clear checkpoint by setting it to undefined
+    const updatedTask = await taskService.updateTask(taskId, { checkpoint: undefined });
+
+    // Broadcast change
+    broadcastTaskChange('updated', updatedTask);
 
     res.json({ success: true });
   })

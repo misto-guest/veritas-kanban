@@ -5,6 +5,66 @@ All notable changes to Veritas Kanban are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-02-15
+
+### ✨ Highlights
+
+**Veritas Kanban 3.3 delivers production-grade task intelligence** — four features that significantly improve task management capabilities, reliability, and accessibility. This release represents the culmination of rigorous cross-model development: all features authored by Sonnet, reviewed by Codex, and scored 10/10 across security, reliability, performance, and accessibility through our 4x10 review gate.
+
+**Key improvements:**
+
+- **Dependency graph** prevents circular dependencies through DFS cycle detection that traverses bidirectional relationships
+- **Crash-recovery checkpointing** protects credentials with auto-sanitization of 20+ secret patterns plus regex value detection
+- **Observational memory** preserves critical context across agent sessions with full-text search and importance scoring
+- **Agent filtering** enables precise task queries by agent name with proper input sanitization
+
+### Added
+
+- **#122 — Task Dependencies Graph**
+  - Bidirectional dependency model (depends_on / blocks) with cycle detection
+  - DFS algorithm traverses both directions to prevent dependency loops
+  - Dependency graph API with recursive tree traversal (`GET /api/tasks/:id/dependencies`)
+  - UI: DependenciesSection component with add/remove for both directions
+  - TaskCard badges showing dependency count
+  - Zod validation on dependency routes
+  - Batch-loaded graph traversal (eliminated N+1 queries)
+  - Full keyboard + ARIA accessibility
+
+- **#123 — Crash-Recovery Checkpointing**
+  - Save/resume/clear API (`POST/GET/DELETE /api/tasks/:id/checkpoint`)
+  - Auto-sanitization of secrets (20+ key patterns + regex value detection)
+  - 1MB size limit on checkpoint state with 24h expiry and automatic cleanup
+  - Resume counter tracks restart attempts
+  - Sub-agent checkpoint context injection into prompts
+  - Array sanitization (nested objects + primitive strings)
+  - NaN timestamp handling
+  - ARIA-accessible checkpoint UI in TaskCard + TaskDetailPanel
+
+- **#124 — Observational Memory**
+  - Add/view/delete observations per task (decision, blocker, insight, context types)
+  - Importance scoring (1-10) with visual badges
+  - Full-text search across all task observations (`GET /api/observations/search`)
+  - Paginated search results (limit/offset, max 200)
+  - Timeline view with type-colored badges
+  - Activity logging for audit trail
+  - XSS prevention via sanitizeCommentText()
+  - ARIA-accessible range slider + decorative icon handling
+
+- **#125 — Agent Filter**
+  - `GET /api/tasks?agent=name` query parameter
+  - Input sanitized (trim + 100 char cap)
+  - Works with existing pagination and filters
+  - JSDoc/OpenAPI documented
+
+### Technical Notes
+
+All features passed comprehensive security review:
+
+- Input sanitization on all user-facing fields
+- XSS prevention in observational memory comments
+- Secret detection and auto-sanitization in checkpoints
+- Cycle detection prevents infinite loops in dependency traversal
+
 ## [3.2.1] - 2026-02-12
 
 ### Fixed

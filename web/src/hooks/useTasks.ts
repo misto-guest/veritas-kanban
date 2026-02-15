@@ -495,6 +495,42 @@ export function useDeleteComment() {
   });
 }
 
+export function useAddObservation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      taskId,
+      data,
+    }: {
+      taskId: string;
+      data: {
+        type: 'decision' | 'blocker' | 'insight' | 'context';
+        content: string;
+        score?: number;
+        agent?: string;
+      };
+    }) => api.tasks.addObservation(taskId, data),
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.setQueryData(['tasks', task.id], task);
+    },
+  });
+}
+
+export function useDeleteObservation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ taskId, observationId }: { taskId: string; observationId: string }) =>
+      api.tasks.deleteObservation(taskId, observationId),
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.setQueryData(['tasks', task.id], task);
+    },
+  });
+}
+
 export function useReorderTasks() {
   const queryClient = useQueryClient();
 

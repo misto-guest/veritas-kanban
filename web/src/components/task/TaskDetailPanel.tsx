@@ -15,6 +15,7 @@ import { DiffViewer } from './DiffViewer';
 import { ReviewPanel } from './ReviewPanel';
 import { PreviewPanel } from './PreviewPanel';
 import { AttachmentsSection } from './AttachmentsSection';
+import { ObservationsSection } from './ObservationsSection';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ApplyTemplateDialog } from './ApplyTemplateDialog';
 import { TaskMetricsPanel } from './TaskMetricsPanel';
@@ -33,8 +34,10 @@ import {
   MessageSquare,
   NotebookPen,
   Workflow,
+  Eye,
 } from 'lucide-react';
 import type { Task, ReviewComment, ReviewState } from '@veritas-kanban/shared';
+import { useAddObservation, useDeleteObservation } from '@/hooks/useTasks';
 
 interface TaskDetailPanelProps {
   task: Task | null;
@@ -174,12 +177,16 @@ export function TaskDetailPanel({
           className="flex-1 flex flex-col overflow-hidden mt-3"
         >
           <TabsList
-            className={`grid w-full flex-shrink-0 ${isCodeTask ? (taskSettings.enableAttachments ? 'grid-cols-8' : 'grid-cols-7') : taskSettings.enableAttachments ? 'grid-cols-4' : 'grid-cols-3'}`}
+            className={`grid w-full flex-shrink-0 ${isCodeTask ? (taskSettings.enableAttachments ? 'grid-cols-9' : 'grid-cols-8') : taskSettings.enableAttachments ? 'grid-cols-5' : 'grid-cols-4'}`}
           >
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="progress" className="flex items-center gap-1">
               <NotebookPen className="h-3 w-3" />
               Progress
+            </TabsTrigger>
+            <TabsTrigger value="observations" className="flex items-center gap-1">
+              <Eye className="h-3 w-3" />
+              Observations
             </TabsTrigger>
             {taskSettings.enableAttachments && (
               <TabsTrigger value="attachments" className="flex items-center gap-1">
@@ -233,6 +240,24 @@ export function TaskDetailPanel({
             <TabsContent value="progress" className="mt-0">
               <FeatureErrorBoundary fallbackTitle="Progress section failed to load">
                 <ProgressTab task={localTask} />
+              </FeatureErrorBoundary>
+            </TabsContent>
+
+            {/* Observations Tab */}
+            <TabsContent value="observations" className="mt-0">
+              <FeatureErrorBoundary fallbackTitle="Observations section failed to load">
+                <ObservationsSection
+                  task={localTask}
+                  onAddObservation={async (data) => {
+                    await addObservation.mutateAsync({ taskId: localTask.id, data });
+                  }}
+                  onDeleteObservation={async (observationId) => {
+                    await deleteObservation.mutateAsync({
+                      taskId: localTask.id,
+                      observationId,
+                    });
+                  }}
+                />
               </FeatureErrorBoundary>
             </TabsContent>
 

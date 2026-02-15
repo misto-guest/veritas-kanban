@@ -22,6 +22,8 @@ import {
   Play,
   CheckCircle,
   XCircle,
+  Save,
+  RotateCcw,
 } from 'lucide-react';
 import { useBulkActions } from '@/hooks/useBulkActions';
 import { formatDuration } from '@/hooks/useTimeTracking';
@@ -115,6 +117,15 @@ function areTaskCardPropsEqual(prev: TaskCardProps, next: TaskCardProps): boolea
     // Attachments — only count matters for the badge
     if ((pt.attachments?.length || 0) !== (nt.attachments?.length || 0)) return false;
     if ((pt.deliverables?.length || 0) !== (nt.deliverables?.length || 0)) return false;
+    // Dependencies — compare counts
+    if ((pt.dependencies?.depends_on?.length || 0) !== (nt.dependencies?.depends_on?.length || 0))
+      return false;
+    if ((pt.dependencies?.blocks?.length || 0) !== (nt.dependencies?.blocks?.length || 0))
+      return false;
+    // Checkpoint — compare existence and step
+    if (!!pt.checkpoint !== !!nt.checkpoint) return false;
+    if (pt.checkpoint?.step !== nt.checkpoint?.step) return false;
+    if (pt.checkpoint?.resumeCount !== nt.checkpoint?.resumeCount) return false;
   }
 
   // blockerTitles — compare array values
@@ -358,6 +369,64 @@ export const TaskCard = memo(function TaskCard({
                         <li key={i}>• {title}</li>
                       ))}
                     </ul>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {/* Dependencies indicator */}
+              {(() => {
+                const dependsOnCount = task.dependencies?.depends_on?.length || 0;
+                const blocksCount = task.dependencies?.blocks?.length || 0;
+                const totalDeps = dependsOnCount + blocksCount;
+
+                if (totalDeps === 0) return null;
+
+                return (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 flex items-center gap-1">
+                        <Link2 className="h-3 w-3" aria-hidden="true" />
+                        {totalDeps}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="space-y-1">
+                        <p className="font-medium">Dependencies</p>
+                        {dependsOnCount > 0 && (
+                          <p className="text-sm">
+                            Depends on: {dependsOnCount} task{dependsOnCount !== 1 ? 's' : ''}
+                          </p>
+                        )}
+                        {blocksCount > 0 && (
+                          <p className="text-sm">
+                            Blocks: {blocksCount} task{blocksCount !== 1 ? 's' : ''}
+                          </p>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })()}
+              {/* Checkpoint indicator */}
+              {task.checkpoint && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 flex items-center gap-1">
+                      <Save className="h-3 w-3" aria-hidden="true" />
+                      <span className="sr-only">Checkpoint saved at </span>
+                      Step {task.checkpoint.step}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="space-y-1">
+                      <p className="font-medium">Checkpoint Saved</p>
+                      <p className="text-sm">Step {task.checkpoint.step}</p>
+                      {task.checkpoint.resumeCount && task.checkpoint.resumeCount > 0 && (
+                        <p className="text-sm flex items-center gap-1">
+                          <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                          Resumed {task.checkpoint.resumeCount} time(s)
+                        </p>
+                      )}
+                    </div>
                   </TooltipContent>
                 </Tooltip>
               )}

@@ -366,12 +366,35 @@ export class ClawdbotAgentService {
   }
 
   private buildTaskPrompt(task: Task, worktreePath: string, attemptId: string): string {
+    // Build checkpoint context if available
+    let checkpointSection = '';
+    if (task.checkpoint) {
+      const resumeCount = task.checkpoint.resumeCount || 0;
+      const checkpointAge = Math.floor(
+        (Date.now() - new Date(task.checkpoint.timestamp).getTime()) / 1000 / 60
+      );
+      checkpointSection = `
+## ⚠️ CHECKPOINT DETECTED — This is a RESUME (not a fresh start)
+
+**Resume Count:** ${resumeCount} time(s)
+**Last Checkpoint:** ${task.checkpoint.timestamp} (${checkpointAge} minutes ago)
+**Last Step:** ${task.checkpoint.step}
+
+### Saved State:
+\`\`\`json
+${JSON.stringify(task.checkpoint.state, null, 2)}
+\`\`\`
+
+**IMPORTANT:** Continue from where you left off. Review the saved state above to understand what was already done.
+`;
+    }
+
     return `# Agent Task Request
 
 **Task ID:** ${task.id}
 **Attempt ID:** ${attemptId}
 **Worktree:** ${worktreePath}
-
+${checkpointSection}
 ## Task: ${task.title}
 
 ${task.description || 'No description provided.'}

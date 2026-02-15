@@ -70,6 +70,17 @@ export interface Comment {
   timestamp: string;
 }
 
+export type ObservationType = 'decision' | 'blocker' | 'insight' | 'context';
+
+export interface Observation {
+  id: string;
+  type: ObservationType;
+  content: string;
+  score: number; // 1-10 importance
+  timestamp: string;
+  agent?: string; // Which agent recorded this
+}
+
 export interface Attachment {
   id: string;
   filename: string; // Sanitized filename stored on disk
@@ -187,7 +198,13 @@ export interface Task {
   // Verification checklist (done criteria)
   verificationSteps?: VerificationStep[];
 
-  // Dependencies
+  // Dependencies (new bidirectional graph)
+  dependencies?: {
+    depends_on?: string[]; // task IDs this task depends on
+    blocks?: string[]; // task IDs this task blocks
+  };
+
+  // Legacy blockedBy field (kept for backward compatibility)
   blockedBy?: string[]; // Array of task IDs that block this task
 
   // Blocked reason (why the task is in blocked status)
@@ -206,6 +223,9 @@ export interface Task {
 
   // Comments
   comments?: Comment[];
+
+  // Observations (task context, decisions, blockers, insights)
+  observations?: Observation[];
 
   // Attachments
   attachments?: Attachment[];
@@ -235,6 +255,14 @@ export interface Task {
   // Lessons learned (captured after task completion)
   lessonsLearned?: string; // Markdown content
   lessonTags?: string[]; // Categorization tags
+
+  // Crash-recovery checkpointing (for sub-agents)
+  checkpoint?: {
+    step: number; // Which step the agent was on
+    state: Record<string, any>; // Agent state (sanitized — no secrets)
+    timestamp: string; // ISO timestamp when checkpoint was saved
+    resumeCount?: number; // How many times this task has been resumed
+  };
 }
 
 export interface ReviewComment {
@@ -289,6 +317,10 @@ export interface UpdateTaskInput {
   subtasks?: Subtask[];
   autoCompleteOnSubtasks?: boolean;
   verificationSteps?: VerificationStep[];
+  dependencies?: {
+    depends_on?: string[];
+    blocks?: string[];
+  };
   blockedBy?: string[];
   blockedReason?: BlockedReason | null; // null to clear
   automation?: {
@@ -299,11 +331,18 @@ export interface UpdateTaskInput {
   };
   timeTracking?: TimeTracking;
   comments?: Comment[];
+  observations?: Observation[];
   attachments?: Attachment[];
   deliverables?: Deliverable[];
   position?: number;
   lessonsLearned?: string;
   lessonTags?: string[];
+  checkpoint?: {
+    step: number;
+    state: Record<string, any>;
+    timestamp: string;
+    resumeCount?: number;
+  };
 }
 
 export interface TaskFilters {
@@ -330,6 +369,10 @@ export interface TaskSummary {
   updated: string;
   subtasks?: Subtask[];
   verificationSteps?: VerificationStep[];
+  dependencies?: {
+    depends_on?: string[];
+    blocks?: string[];
+  };
   blockedBy?: string[];
   blockedReason?: BlockedReason;
   position?: number;
@@ -341,6 +384,11 @@ export interface TaskSummary {
     isRunning: boolean;
   };
   attempt?: TaskAttempt;
+  checkpoint?: {
+    step: number;
+    timestamp: string;
+    resumeCount?: number;
+  };
 }
 
 /**
