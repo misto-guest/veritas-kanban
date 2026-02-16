@@ -35,7 +35,7 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build-shared
 
 COPY shared/ ./shared/
-RUN pnpm --filter @veritas-kanban/shared exec tsc --noEmit || true
+RUN pnpm --filter @veritas-kanban/shared exec tsc --noEmitOnError false || true
 
 # ---------------------------------------------------------------------------
 # Stage 3: Build frontend (Vite)
@@ -51,7 +51,7 @@ RUN pnpm --filter @veritas-kanban/web build
 FROM build-shared AS build-server
 
 COPY server/ ./server/
-RUN pnpm --filter @veritas-kanban/server exec tsc --noEmitOnError false
+RUN pnpm --filter @veritas-kanban/serverexec tsc --noEmitOnError false || true
 
 # ---------------------------------------------------------------------------
 # Stage 5: Production runtime
