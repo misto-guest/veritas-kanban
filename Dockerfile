@@ -35,7 +35,7 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build-shared
 
 COPY shared/ ./shared/
-RUN pnpm --filter @veritas-kanban/server exec tsc --noEmit || true
+RUN pnpm --filter @veritas-kanban/shared exec tsc --noEmit || true
 
 # ---------------------------------------------------------------------------
 # Stage 3: Build frontend (Vite)
