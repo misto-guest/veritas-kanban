@@ -43,8 +43,7 @@ RUN pnpm --filter @veritas-kanban/shared exec tsc --noEmitOnError false || true
 FROM build-shared AS build-web
 
 COPY web/ ./web/
-RUN pnpm --filter @veritas-kanban/web exec tsc --noEmitOnError false || true
-
+RUN pnpm --filter @veritas-kanban/web exec vite build
 # ---------------------------------------------------------------------------
 # Stage 4: Build server (TypeScript)
 # ---------------------------------------------------------------------------
