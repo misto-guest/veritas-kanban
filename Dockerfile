@@ -111,4 +111,6 @@ WORKDIR /app/server
 
 # Start server
 #CMD ["node", "dist/index.js"]
-CMD ["sh", "-c", "chown -R veritas:nodejs /app/data /app/.veritas-kanban /app/tasks && su veritas -s /bin/sh -c 'node dist/index.js'"]
+#CMD ["sh", "-c", "chown -R veritas:nodejs /app/data /app/.veritas-kanban /app/tasks && su veritas -s /bin/sh -c 'node dist/index.js'"]
+# Start as root, create a subfolder, and give it wide permissions
+CMD ["sh", "-c", "mkdir -p /app/data/veritas && chmod 777 /app/data/veritas && su veritas -s /bin/sh -c 'node dist/index.js'"]
