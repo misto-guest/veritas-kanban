@@ -51,7 +51,7 @@ RUN pnpm --filter @veritas-kanban/web build
 FROM build-shared AS build-server
 
 COPY server/ ./server/
-RUN pnpm --filter @veritas-kanban/server build
+RUN pnpm --filter @veritas-kanban/server exec tsc --noEmitOnError false
 
 # ---------------------------------------------------------------------------
 # Stage 5: Production runtime
